@@ -39,7 +39,6 @@ dev = [
 infra = [
     "aws-cdk-lib>=2.85.0",
     "constructs>=10.2.0",
-    "pytest-cdk>=0.0.1",
 ]
 
 [tool.black]
