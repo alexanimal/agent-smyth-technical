@@ -7,6 +7,12 @@ on:
       - 'infrastructure/**'
       - 'cdk.json'
       - '.github/workflows/deploy-infra.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infrastructure/**'
+      - 'cdk.json'
+      - '.github/workflows/deploy-infra.yml'
 
 jobs:
   deploy:
