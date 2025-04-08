@@ -1,0 +1,14 @@
+/venv
+.env
+faiss_index/
+__pycache__
+.pytest_cache
+.DS_Store
+.mypy_cache
+.ruff_cache
+.vscode
+.idea
+.pytest_cache
+cdk.out/
+.coverage
+__mocks__/
