@@ -113,6 +113,47 @@ class TestPromptManager:
         assert "question" in input_variables
         assert "context" in input_variables
 
+    def test_get_technical_analysis_prompt_structure(self):
+        """Test the structure of the technical analysis prompt template."""
+        # Act
+        prompt = PromptManager.get_technical_analysis_prompt()
+
+        # Assert
+        assert isinstance(prompt, ChatPromptTemplate)
+        messages = prompt.messages
+
+        # Check we have the expected number of messages
+        assert len(messages) == 3
+
+        # Check for key sections in the system message using our helper
+        key_sections = [
+            "TECHNICAL INDICATOR ANALYSIS",
+            "CHART PATTERN RECOGNITION",
+            "SUPPORT & RESISTANCE ANALYSIS",
+            "MULTI-TIMEFRAME CONFIRMATION",
+            "PRECISE TRADE RECOMMENDATION",
+            "RISK/REWARD ASSESSMENT",
+        ]
+        for section in key_sections:
+            assert_message_contains(messages[0], section)
+
+        # Check for specific technical indicators
+        technical_terms = [
+            "Moving Averages",
+            "RSI",
+            "MACD",
+            "Bollinger Bands",
+            "Volume",
+            "price levels",
+        ]
+        for term in technical_terms:
+            assert_message_contains(messages[0], term)
+
+        # Check input variables
+        input_variables = prompt.input_variables
+        assert "question" in input_variables
+        assert "context" in input_variables
+
     def test_get_classification_prompt_structure(self):
         """Test the structure of the classification prompt template."""
         # Act
@@ -133,6 +174,7 @@ class TestPromptManager:
         assert_message_contains(messages[0], "query classifier")
         assert_message_contains(messages[0], "investment")
         assert_message_contains(messages[0], "trading_thesis")
+        assert_message_contains(messages[0], "technical")
         assert_message_contains(messages[0], "general")
 
         # Check input variables
@@ -230,6 +272,28 @@ class TestPromptManager:
         # Assert
         assert mock_from_messages.called
         assert result == mock_template
+
+    def test_classification_prompt_technical_query(self):
+        """Test that the classification prompt correctly formats technical analysis queries."""
+        # Arrange
+        test_query = "What do the RSI and MACD indicators show for Tesla? Is it overbought?"
+
+        # Act
+        classification_prompt = PromptManager.get_classification_prompt()
+        formatted = classification_prompt.format_messages(query=test_query)
+
+        # Assert
+        assert len(formatted) == 2
+        assert formatted[1].content == test_query
+
+        # Check that the system prompt includes instructions for technical analysis
+        # Convert to string if it's not already to avoid type errors
+        system_message = str(formatted[0].content)
+        assert "technical analysis" in system_message.lower()
+        assert "technical indicators" in system_message.lower()
+        assert "RSI" in system_message
+        assert "MACD" in system_message
+        assert 'respond with "technical"' in system_message
 
 
 if __name__ == "__main__":

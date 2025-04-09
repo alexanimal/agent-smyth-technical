@@ -1,3 +1,18 @@
+"""
+Configuration module for the RAG Agent application.
+
+This module handles loading and validating environment variables, setting up logging,
+and initializing Sentry for error tracking. It provides a centralized configuration
+management system through the Settings class.
+
+Typical usage:
+    from app.config import settings
+
+    # Access configuration values
+    model = settings.model_name
+    api_key = settings.openai_api_key
+"""
+
 import logging
 import os
 from typing import List
@@ -9,7 +24,24 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """
+    Application settings loaded from environment variables.
+
+    This class uses Pydantic's BaseSettings to load and validate
+    environment variables, with fallbacks to a .env file.
+    It handles configuration for API keys, model selection,
+    logging, and external services.
+
+    Attributes:
+        openai_api_key (str): OpenAI API key for LLM access
+        api_key (str, optional): API key for authenticating requests
+        environment (str): Deployment environment (development, staging, production)
+        sentry_dsn (str, optional): Sentry DSN for error tracking
+        model_name (str): Name of the OpenAI model to use
+        log_level (str): Logging verbosity level
+        mocks_dir_name (str): Directory name for mock data storage
+        cors_origins (List[str]): List of allowed origins for CORS
+    """
 
     openai_api_key: str = Field(..., alias="OPENAI_API_KEY")
     api_key: str | None = Field(None, alias="API_KEY")  # For production auth
@@ -23,13 +55,32 @@ class Settings(BaseSettings):
     )
 
     class Config:
+        """
+        Configuration for the Settings class.
+
+        Specifies environment file location, encoding, and how to handle
+        extra environment variables.
+        """
+
         env_file = ".env"
         env_file_encoding = "utf-8"
         extra = "ignore"  # Ignore extra env vars
 
 
 def setup_logging_and_sentry(settings: Settings):
-    """Configure logging and initialize Sentry if DSN is provided."""
+    """
+    Configure logging and initialize Sentry if DSN is provided.
+
+    Sets up the Python logging system with the configured log level and
+    initializes Sentry for error tracking if in production environment
+    and a Sentry DSN is provided.
+
+    Args:
+        settings (Settings): Application settings including log level and Sentry configuration
+
+    Returns:
+        None
+    """
     logging.basicConfig(level=settings.log_level.upper())
     logger = logging.getLogger(__name__)
     logger.info(f"Logging configured with level: {settings.log_level.upper()}")

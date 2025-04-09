@@ -1,6 +1,11 @@
 """
 FastAPI application entry point for the RAG Agent.
-Assembles routers, middleware, configuration, and lifespan events.
+
+This module serves as the entry point for the FastAPI application that powers the RAG Agent.
+It handles the assembly of routers, middleware, configuration, and lifespan events.
+
+The application exposes a REST API for querying the knowledge base with natural language
+questions and receiving detailed responses with source attribution.
 """
 
 import asyncio
@@ -24,6 +29,19 @@ setup_logging_and_sentry(settings)
 # Define lifespan manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Manage the application lifecycle events.
+
+    This async context manager ensures proper initialization of services during startup
+    and cleanup during shutdown. It's responsible for initializing the knowledge base
+    and other services asynchronously.
+
+    Args:
+        app (FastAPI): The FastAPI application instance.
+
+    Yields:
+        None: Control is yielded back to the application while it's running.
+    """
     # Startup: Trigger background initialization of services (KB, etc.)
     startup_task = asyncio.create_task(initialize_services())
     yield
@@ -92,10 +110,23 @@ app.include_router(chat_router.router)
 
 # Root endpoint is now in status_router, included above.
 
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
 # Development server execution (if running this file directly)
 if __name__ == "__main__":
     import uvicorn
 
+    """
+    Development server configuration.
+
+    This code block only executes when the module is run directly.
+    It configures and launches the Uvicorn ASGI server with development
+    settings (hot reload enabled).
+    """
     # Run referring to the app instance in *this* file
     # Use the correct path relative to project root if running from there
     # Example: python -m src.main
