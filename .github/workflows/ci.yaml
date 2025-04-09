@@ -52,7 +52,7 @@ jobs:
       - name: Install dependencies
         # Install all dependencies including dev groups
         # Use --sync if you want exact lock file versions, omit if you want potential updates within constraints
-        run: poetry install --all-extras --no-root
+        run: poetry install --all-extras
 
       - name: Run linting and formatting checks
         run: |
