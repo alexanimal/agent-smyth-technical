@@ -43,7 +43,7 @@ class ApiStack(Stack):
                     "OPENAI_API_KEY": ecs.Secret.from_secrets_manager(
                         # Use the existing secret named AgentSmyth
                         secretsmanager.Secret.from_secret_name_v2(
-                            self, f"{id}-AgentSmythSecretImport", "AgentSmyth"
+                            self, f"{id}-OpenAiApiKey", "AgentSmyth"
                         ),
                         # Extract the field named OPENAI_API_KEY from the secret's JSON value
                         "OPENAI_API_KEY"
@@ -51,7 +51,7 @@ class ApiStack(Stack):
                     "SENTRY_DSN": ecs.Secret.from_secrets_manager(
                         # Use the existing secret named AgentSmyth
                         secretsmanager.Secret.from_secret_name_v2(
-                            self, f"{id}-AgentSmythSecretImport", "AgentSmyth"
+                            self, f"{id}-SentryDsn", "AgentSmyth"
                         ),
                         "SENTRY_DSN"
                     ),
