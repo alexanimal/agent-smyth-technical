@@ -68,8 +68,8 @@ jobs:
         run: |
           poetry run pytest --cov=app --cov-report=json
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.json
+          slug: alexanimal/agent-smyth-technical
