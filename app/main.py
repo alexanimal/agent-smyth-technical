@@ -111,6 +111,15 @@ app.include_router(chat_router.router)
 # Root endpoint is now in status_router, included above.
 
 
+# Health endpoint is defined here in main.py instead of in a router for several reasons:
+# 1. Critical infrastructure dependency: ELB/target group health checks need this endpoint
+#    to be available even if other parts of the application fail to initialize
+# 2. Minimal dependencies: Keeping it in main.py ensures it has no dependencies on other
+#    modules that might fail to load
+# 3. Immediate availability: The endpoint needs to be available as soon as the application
+#    starts, even while background initialization tasks are still running
+# This is a common pattern for containerized applications in ECS/Kubernetes environments
+# where health checks are critical for proper container lifecycle management
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}

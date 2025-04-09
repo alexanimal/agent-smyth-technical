@@ -65,7 +65,7 @@ class ApiStack(Stack):
 
         # Configure the target group's health check
         fargate_service.target_group.configure_health_check(
-            path="/health",
+            protocol=elbv2.Protocol.TCP,
             healthy_threshold_count=2,
             unhealthy_threshold_count=3,
             timeout=Duration.seconds(5),
