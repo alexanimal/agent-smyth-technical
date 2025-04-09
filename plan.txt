@@ -21,3 +21,4 @@ Create and Agent associated with our Knowledge Base Documents and query the know
 - handling model selection in the API
 - unit testing
 - React App deployment and infrastructure
+- update integration tests

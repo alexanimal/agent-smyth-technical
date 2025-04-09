@@ -9,7 +9,7 @@ __pycache__
 .ruff_cache
 .vscode
 .idea
-.pytest_cache
+.mypy_cache
 cdk.out/
 .coverage
 ui/node_modules/

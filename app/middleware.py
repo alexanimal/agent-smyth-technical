@@ -1,9 +1,11 @@
-import time
 import logging
-from fastapi import Request, Response
+import time
 from uuid import uuid4
 
+from fastapi import Request, Response
+
 logger = logging.getLogger(__name__)
+
 
 async def log_requests(request: Request, call_next):
     """Middleware to log incoming requests and add timing/ID headers."""
@@ -22,7 +24,7 @@ async def log_requests(request: Request, call_next):
 
         # Add headers to response
         response.headers["X-Request-ID"] = request_id
-        response.headers["X-Processing-Time"] = f"{process_time:.4f}" # More precision
+        response.headers["X-Processing-Time"] = f"{process_time:.4f}"  # More precision
 
         # Log request end
         logger.info(
@@ -38,4 +40,4 @@ async def log_requests(request: Request, call_next):
         )
         # Allow FastAPI's exception handlers to deal with it, but ensure ID is available
         # We can't easily add headers here as the response object might not be formed yet
-        raise e # Re-raise the exception 
+        raise e  # Re-raise the exception
