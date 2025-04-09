@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import List
 
 import sentry_sdk
 from dotenv import load_dotenv
@@ -17,6 +18,10 @@ class Settings(BaseSettings):
     model_name: str = Field("gpt-4o-mini", alias="MODEL_NAME")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     mocks_dir_name: str = Field("data", alias="MOCKS_DIR_NAME")
+    cors_origins: List[str] = Field(
+        default=["http://localhost:3000", "http://localhost:5173"],
+        alias="CORS_ORIGINS"
+    )
 
     class Config:
         env_file = ".env"

@@ -25,6 +25,9 @@ with (
 # Test client
 client = TestClient(app)
 
+# Define a dummy API key for testing
+TEST_API_KEY = "1234567890"
+
 
 @pytest.fixture
 def mock_knowledge_base():
@@ -85,7 +88,7 @@ def test_chat_endpoint(setup_mocks):
     # which we already mocked in setup_mocks. No need to patch the dependency getter itself.
     response = client.post(
         "/chat",
-        headers={"User-Agent": "pytest-client"},  # Add headers if middleware uses them
+        headers={"User-Agent": "pytest-client", "X-API-Key": TEST_API_KEY}, # Add API key header
         json={"message": "Test message", "num_results": 3},
     )
 
@@ -113,7 +116,11 @@ def test_chat_endpoint_error(setup_mocks):
     setup_mocks.process_query.side_effect = Exception("Test error")
 
     # No need to patch the dependency getter
-    response = client.post("/chat", json={"message": "Test message"})
+    response = client.post(
+        "/chat",
+        headers={"X-API-Key": TEST_API_KEY}, # Add API key header
+        json={"message": "Test message"}
+    )
 
     # Check error response
     assert response.status_code == 500

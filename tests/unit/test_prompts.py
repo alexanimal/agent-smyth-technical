@@ -53,8 +53,8 @@ class TestPromptManager:
 
         # Use our updated assertion helper
         assert_message_contains(messages[0], "financial advisor")
-        assert_message_contains(messages[0], "Buy")
-        assert_message_contains(messages[0], "Sell")
+        assert_message_contains(messages[0], "Long")
+        assert_message_contains(messages[0], "Short")
         assert_message_contains(messages[0], "Hold")
 
         # Check input variables
@@ -206,7 +206,8 @@ class TestPromptManager:
 
         # Assert
         # Check chat history is included in the formatted messages
-        all_content = " ".join([msg.content for msg in formatted if hasattr(msg, "content")])
+        # Ensure only string content is joined
+        all_content = " ".join([msg.content for msg in formatted if hasattr(msg, "content") and isinstance(msg.content, str)])
         assert "What do you think about Tesla?" in all_content
         assert "Based on the tweets, sentiment is positive." in all_content
 

@@ -16,3 +16,4 @@ ui/node_modules/
 ui/.next/
 ui/dist/
 ui/tsconfig.tsbuildinfo
+coverage.xml

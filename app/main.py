@@ -62,11 +62,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=(
-        settings.cors_origins
-        if hasattr(settings, "cors_origins")
-        else ["http://localhost:3000", "http://localhost:5173"]
-    ),  # Example: Make origins configurable
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=[
