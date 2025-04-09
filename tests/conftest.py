@@ -13,9 +13,9 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def mock_env_vars(monkeypatch):
     """Automatically mock required environment variables for the test session."""
-    monkeypatch.setenv("OPENAI_API_KEY", "test-dummy-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "1234567890")
     # Add any other required environment variables here if needed
     # monkeypatch.setenv("ANOTHER_VAR", "dummy_value")
