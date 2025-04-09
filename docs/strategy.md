@@ -46,6 +46,78 @@ I implemented a query classification system that routes questions to specialized
 
 This classification ensures that each query receives the most appropriate analytical treatment.
 
+## Advanced Prompting Strategy
+
+My microservice uses a sophisticated prompting strategy engineered to eliminate biases and provide balanced, nuanced financial analysis. This approach involves multiple components working together:
+
+### Confidence-Based Classification
+
+Rather than using rigid categorization, the system implements confidence-based query classification that:
+
+- Assigns confidence scores (0-100%) to multiple categories simultaneously
+- Detects mixed-intent queries that span multiple categories (30%+ in secondary category)
+- Adapts retrieval depth and processing approach based on confidence distribution
+- Enhances handling of nuanced financial queries that cross traditional boundaries
+
+### Specialized Domain-Specific Prompts
+
+I developed four specialized prompt templates optimized for different financial query types:
+
+1. **Investment Prompts**
+   - Provides nuanced position recommendations with confidence levels (0-100%)
+   - Includes explicit time horizon analysis (short/medium/long-term)
+   - Quantifies bullish vs. bearish signals with clear evidence ratios
+   - Considers different market regimes (trending, range-bound, volatile)
+
+2. **Trading Thesis Prompts**
+   - Transforms PM notes into comprehensive trading frameworks
+   - Integrates both fundamental and technical analyses
+   - Prescribes precise entry/exit points with risk/reward calculations
+   - Contains dedicated "Competing Hypotheses" and "Red Team Analysis" sections
+
+3. **Technical Analysis Prompts**
+   - Structured analysis of indicators (momentum, trend, volatility, volume)
+   - Pattern recognition with reliability statistics
+   - Multi-timeframe confirmation analysis
+   - Separate bull/bear scenarios with explicit probability assignments
+
+4. **General Knowledge Prompts**
+   - Factual response generation with source attribution
+   - Explicit uncertainty acknowledgment
+   - Tweet-specific context utilization
+   - Source quantity transparency
+
+### Debiasing Techniques
+
+The prompting strategy incorporates several techniques to reduce cognitive biases:
+
+- **Probabilistic Framing**: All recommendations include explicit confidence levels
+- **Counter-Narrative Generation**: Higher-temperature models generate alternative perspectives
+- **Viewpoint Diversity**: Balanced representation of bullish and bearish evidence
+- **Cognitive Bias Identification**: Explicit sections identifying confirmation bias, recency bias, and anchoring bias
+- **Market Regime Analysis**: Considers how recommendations change under different market conditions
+- **Time Horizon Diversification**: Analyzes short, medium, and long-term implications
+
+### Multi-Temperature Strategy
+
+The system employs different temperature settings for specialized tasks:
+
+- **Primary Analysis**: Standard temperature (T=0) for deterministic reasoning
+- **Technical Analysis**: Lower temperature (T-0.2) for precise indicator interpretation
+- **Alternative Viewpoints**: Higher temperature (T+0.3) for creative, divergent thinking
+- **Classification**: Zero temperature for consistent, reliable query categorization
+
+### Adaptive Document Retrieval
+
+The document retrieval system dynamically adjusts based on query characteristics:
+
+- **Query Complexity**: More complex queries receive proportionally more context documents
+- **Viewpoint Diversity**: Documents are selected to balance recency (70%) and sentiment diversity (30%)
+- **Sentiment Analysis**: Each document receives a sentiment score to ensure balanced perspective
+- **Mixed Query Handling**: Queries spanning multiple categories receive broader context
+
+These advanced prompting strategies significantly enhance the quality and reliability of trading recommendations by systematically reducing biases, considering diverse perspectives, and providing appropriately calibrated confidence levels for financial decision-making.
+
 ## Technical Implementation Details
 
 ### Knowledge Base Processing

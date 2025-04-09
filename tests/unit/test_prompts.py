@@ -55,7 +55,7 @@ class TestPromptManager:
         assert_message_contains(messages[0], "financial advisor")
         assert_message_contains(messages[0], "Long")
         assert_message_contains(messages[0], "Short")
-        assert_message_contains(messages[0], "Hold")
+        assert_message_contains(messages[0], "Neutral")
 
         # Check input variables
         input_variables = prompt.input_variables
@@ -293,7 +293,7 @@ class TestPromptManager:
         assert "technical indicators" in system_message.lower()
         assert "RSI" in system_message
         assert "MACD" in system_message
-        assert 'Respond with "technical"' in system_message
+        assert "JSON object with confidence scores" in system_message
 
 
 if __name__ == "__main__":

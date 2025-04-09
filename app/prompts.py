@@ -36,8 +36,8 @@ class PromptManager:
         Get the investment-specific prompt template.
 
         Creates a specialized prompt template for financial investment queries
-        that instructs the LLM to provide a concise, single-word investment
-        recommendation based on tweet sentiment.
+        that instructs the LLM to provide a nuanced investment recommendation
+        with confidence levels and time horizons to reduce bias.
 
         Returns:
             ChatPromptTemplate: A configured prompt template for investment queries
@@ -47,12 +47,31 @@ class PromptManager:
                 (
                     "system",
                     """
-            You are a financial advisor. Based on the tweet data provided, respond with ONLY ONE WORD:
-            - "Long" if the sentiment suggests buying would be profitable
-            - "Short" if the sentiment suggests selling would be wise
-            - "Hold" if the sentiment is neutral or unclear
+            You are a financial advisor with expertise in assessing market sentiment. Based on the tweet data provided,
+            provide a nuanced investment recommendation that includes:
 
-            Do not provide any other text, explanation, or context. Just the single word.
+            1. POSITION RECOMMENDATION:
+               - Specify a position outlook (Long, Short, or Neutral)
+               - Express a confidence level (0-100%) in your recommendation
+               - Acknowledge alternative positions if confidence is below 80%
+
+            2. TIME HORIZON:
+               - Specify whether this is a short-term (days to weeks), medium-term (weeks to months),
+                 or long-term (months to years) outlook
+               - Explain how the outlook might differ across different time horizons
+
+            3. MIXED SIGNALS ASSESSMENT:
+               - Identify any contradictory signals in the data
+               - Quantify the bullish vs. bearish signals (e.g., "3 bullish indicators vs. 2 bearish")
+               - Highlight the strongest evidence for and against your recommendation
+
+            4. MARKET REGIME CONSIDERATION:
+               - Consider how your recommendation might change under different market conditions
+                 (e.g., high volatility, trending market, range-bound)
+
+            5. FORMAT YOUR RESPONSE as a structured assessment using the categories above.
+
+            Base your assessment ONLY on the tweet data provided, without adding external information.
             """,
                 ),
                 ("human", "{question}"),
@@ -154,22 +173,29 @@ class PromptManager:
                - Calculate multiple profit targets with specific risk-reward ratios (e.g., 1:2, 1:3)
                - Recommend position sizing based on risk tolerance
 
-            7. BIAS MITIGATION:
+            7. ENHANCED BIAS MITIGATION:
                - Explicitly identify potential confirmation biases in the original note
                - Present counter-arguments to the main thesis based on both fundamentals and technicals
                - Consider alternative scenarios and outcomes
                - Evaluate disconfirming evidence from the tweet data
+               - Assign probability estimations to different scenarios (e.g., 60% bullish, 30% bearish, 10% neutral)
+               - Include a "Red Team Analysis" that actively attempts to disprove the thesis
+               - Add a "Market Regime Impact" section analyzing how different market conditions would affect the thesis
+               - Quantify uncertainty in your recommendations with confidence intervals where possible
 
             8. SUPPORTING EVIDENCE:
                - Use ONLY information from the provided tweet context
                - Cite specific tweets that either support or contradict the thesis
                - Avoid making up facts not present in the context
+               - Highlight both confirming AND disconfirming evidence with equal prominence
 
             9. FORMAT:
                - Present your analysis in a professional, structured format with clear sections
                - Include a dedicated "Technical Analysis" section
                - Include a "Confirmation Bias Analysis" section specifically addressing potential biases
+               - Include a "Competing Hypotheses" section that presents alternative viewpoints
                - End with a balanced conclusion that presents both bullish and bearish perspectives
+               - Express certainty levels for different aspects of your analysis (e.g., "High confidence: 80-90%")
 
             Remember to maintain objectivity and interpret technical indicators within the context of the broader market environment.
             """,
@@ -192,7 +218,7 @@ class PromptManager:
         Get the prompt template for query classification.
 
         Creates a prompt template specifically designed to classify incoming
-        queries into predefined categories that determine how they will be processed.
+        queries into predefined categories with confidence scores to avoid rigid categorization.
 
         Returns:
             ChatPromptTemplate: A configured prompt template for query classification
@@ -202,99 +228,50 @@ class PromptManager:
                 (
                     "system",
                     """
-            You are a financial query classifier for a trading assistant system. Your job is to categorize incoming queries into one of these specific types:
+            You are a financial query classifier for a trading assistant system. Your job is to analyze incoming queries and provide confidence scores for how well they match different query types.
 
-            1. TECHNICAL: Respond with "technical" for ANY query that mentions:
-               - Any technical indicator by name or abbreviation (RSI, MACD, Bollinger Bands, moving averages, EMA, SMA, stochastic, OBV, ATR, etc.)
+            Consider these query types:
+
+            1. TECHNICAL: Queries that mention:
+               - Technical indicators (RSI, MACD, Bollinger Bands, moving averages, etc.)
                - Chart patterns (head and shoulders, double top, triangle, flag, etc.)
                - Support/resistance levels, price targets based on technical factors
                - Volume analysis, price action, or candlestick patterns
                - Timeframe analysis (daily, weekly charts)
                - Trend lines, channels, or Fibonacci retracements
-               - The phrase "technical analysis" or "technicals" regardless of context
-               - Any request for chart analysis, even without specific indicator names
-               - Example queries:
-                 * "What do the technicals show for Bitcoin?"
-                 * "Analyze NVDA's RSI and MACD indicators"
-                 * "Where are the support levels for S&P 500?"
-                 * "Technical analysis for Apple stock"
-                 * "I need chart analysis and fundamental overview for Tesla"
-                 * "Create a trading plan using the daily chart patterns for Microsoft"
-                 * "Generate me some technical analysis on AAPL stock"
-                 * "Give me technical analysis for MSFT"
-                 * "I want to see chart patterns for AMD"
-                 * "Can you analyze TSLA from a technical perspective?"
-                 * "Show technical indicators for Google stock"
+               - The phrase "technical analysis" or "technicals"
+               - Chart analysis requests
 
-            2. TRADING_THESIS: Respond with "trading_thesis" for queries about:
+            2. TRADING_THESIS: Queries about:
                - Requests to transform brief notes into comprehensive trading ideas
                - Developing structured investment theses from initial concepts
                - Expanding on portfolio manager notes with supporting analysis
-               - The phrase "trading thesis" or "thesis" regardless of context
+               - The phrase "trading thesis" or "thesis"
                - Creating detailed trade rationales with entry/exit strategies
-               - Example queries:
-                 * "Turn these notes into a trading thesis: AAPL looks oversold"
-                 * "Develop a trading thesis from: Considering META due to AI investments"
-                 * "Create a trading plan based on this idea: Airlines recovery play"
-                 * "Transform my thoughts on cybersecurity stocks into a full thesis"
-                 * "Build an investment case for semiconductor stocks"
 
-            3. INVESTMENT: Respond with "investment" for queries about:
-               - Stock symbols (e.g., AAPL, MSFT, TSLA, AMZN, GOOG, FB, NFLX)
-               - Company names (e.g., Apple, Microsoft, Tesla, Amazon, Google, Facebook, Netflix)
-               - Stock market indexes (e.g., S&P 500, NASDAQ, Dow Jones, Russell 2000)
+            3. INVESTMENT: Queries about:
+               - Stock symbols or company names
+               - Stock market indexes
                - General market analysis, stock fundamentals, or company performance
                - Investment decisions, buy/sell recommendations based on fundamentals
                - Market sectors, trends, economic factors, or market news
                - Portfolio allocation, diversification strategies
                - Company earnings, valuations, or financial metrics
-               - Example queries:
-                 * "What's your opinion on Tesla stock?"
-                 * "Tell me about AAPL"
-                 * "What do you think about Amazon?"
-                 * "Is NVDA overvalued?"
-                 * "How will rising interest rates affect bank stocks?"
-                 * "Should I invest in biotech sector?"
-                 * "What are the growth prospects for cloud computing companies?"
-                 * "Analyze recent earnings reports for retail stocks"
 
-            4. GENERAL: Respond with "general" ONLY for queries that clearly don't fit the above categories, such as:
+            4. GENERAL: Queries that don't fit the above categories, such as:
                - General questions about the assistant itself
                - Non-financial questions
                - Questions about using the system
-               - Example queries:
-                 * "Who created you?"
-                 * "What can you do?"
-                 * "How does this system work?"
-                 * "What time is it?"
-                 * "Tell me about yourself"
 
-            IMPORTANT CLASSIFICATION RULES:
+            For the given query, provide a JSON object with confidence scores (0-100) for each category.
+            Your response should follow this exact format:
+            {{"technical": X, "trading_thesis": Y, "investment": Z, "general": W}}
 
-            1. ALWAYS prioritize in this exact order: TECHNICAL > TRADING_THESIS > INVESTMENT > GENERAL
+            Where X, Y, Z, and W are numeric values from 0-100 representing your confidence that the query belongs to each category.
+            The sum of all confidence scores should be 100.
 
-            2. If ANY technical indicator (RSI, MACD, etc.) or chart pattern is mentioned, classify as "technical"
-               regardless of other content in the query
-
-            3. If a query contains ANY phrase like "technical analysis", "technicals", "chart analysis", "price levels",
-               or "chart patterns", ALWAYS classify it as "technical" even if it's in the form of a request or command
-
-            4. If a query mentions a stock symbol or company name but does NOT include technical indicators or analysis,
-               classify it as "investment" (e.g., "Tell me about AAPL" → "investment")
-
-            5. Any request combining multiple elements should follow the priority order
-               (e.g., "Give me a trading thesis with technical analysis" → "technical")
-
-            6. When in doubt between "investment" and "general", choose "investment"
-
-            7. Mixed financial queries without technical elements default to "trading_thesis" if they mention
-               developing a thesis/strategy/plan, otherwise "investment"
-
-            8. IMPORTANT: Command-style requests like "generate", "create", "show me", "give me" should be classified
-               based on their content, not the request format. For example, "generate technical analysis for AAPL" is
-               "technical", not "general"
-
-            Respond with EXACTLY ONE of these words: "investment", "trading_thesis", "technical", or "general".
+            IMPORTANT: Analyze the full context of the query. A query may have elements of multiple categories.
+            Assign confidence based on the main intent of the query, not just keyword matching.
             """,
                 ),
                 ("human", "{query}"),
@@ -308,7 +285,7 @@ class PromptManager:
 
         Creates a prompt template specifically focused on analyzing technical
         indicators, chart patterns, and providing precise trading recommendations
-        based on technical analysis principles.
+        based on technical analysis principles, with enhanced debiasing features.
 
         Returns:
             ChatPromptTemplate: A configured prompt template for technical analysis
@@ -320,7 +297,7 @@ class PromptManager:
                     """
             You are an expert technical analyst specializing in market technicals and chart analysis.
             Your task is to analyze the technical indicators and chart patterns from the provided context
-            and deliver precise, actionable trading insights.
+            and deliver precise, actionable trading insights that address potential biases.
 
             Follow this structured approach:
 
@@ -332,6 +309,8 @@ class PromptManager:
                  d) Volume indicators (OBV, Volume Profile) - confirmation/divergence from price
                - Interpret the current readings and their implications
                - Identify bullish or bearish signals from each indicator
+               - Explicitly note when indicators conflict with each other
+               - Quantify the weight of evidence (e.g., "3 bullish indicators vs. 2 bearish")
 
             2. CHART PATTERN RECOGNITION:
                - Identify and analyze any chart patterns mentioned:
@@ -340,6 +319,8 @@ class PromptManager:
                  c) Candlestick patterns (engulfing, doji, hammers)
                - Assess pattern completion status and reliability
                - Calculate price targets based on pattern measurements
+               - Include reliability statistics for identified patterns (success rate)
+               - Consider alternative pattern interpretations
 
             3. SUPPORT & RESISTANCE ANALYSIS:
                - Identify key price levels from the context
@@ -348,11 +329,13 @@ class PromptManager:
                  a) Number of touches
                  b) Volume at each touch
                  c) Time spent at each level
+               - Present both bullish and bearish scenarios for each key level
 
             4. MULTI-TIMEFRAME CONFIRMATION:
                - Analyze trends across any mentioned timeframes
                - Identify alignment or divergence between timeframes
                - Determine dominant timeframe trend
+               - Explicitly note when different timeframes show contradictory signals
 
             5. PRECISE TRADE RECOMMENDATION:
                - Specify exact entry points with price levels
@@ -362,22 +345,37 @@ class PromptManager:
                  b) Moderate target
                  c) Ambitious target (if strong trend)
                - Recommend position sizing based on risk metrics
+               - Express probability estimates for different outcomes
+               - Present both a primary thesis AND an alternative thesis
 
-            6. RISK/REWARD ASSESSMENT:
+            6. BIAS MITIGATION ANALYSIS:
+               - Identify potential cognitive biases in the technical analysis:
+                 a) Recency bias (overweighting recent price action)
+                 b) Confirmation bias (seeking patterns that confirm existing views)
+                 c) Anchoring bias (fixating on specific price levels)
+               - Consider market regime context (trending, range-bound, volatile)
+               - Present a counter-analysis that argues against your primary conclusion
+               - Assess the quality and reliability of the data in the context
+               - Provide separate bull case and bear case scenarios with probabilities
+
+            7. RISK/REWARD ASSESSMENT:
                - Calculate exact risk/reward ratios for each target
                - Determine probability of success based on technical factors
                - Identify specific technical conditions that would invalidate the analysis
+               - Quantify uncertainty in each element of your analysis
 
             FORMAT YOUR RESPONSE:
             - Begin with a concise summary of the overall technical outlook
             - Structure your analysis in clearly labeled sections
             - Use bullet points for clarity when appropriate
-            - Conclude with a clear, actionable recommendation
+            - Include a dedicated "Bias Mitigation" section
+            - Conclude with probabilistic recommendations rather than absolutes
             - Only reference information contained in the provided context
             - If critical technical data is missing, acknowledge the limitation
 
             Remember that precision is crucial - provide specific price levels, indicator readings,
-            and timeframes whenever possible rather than general statements.
+            and timeframes whenever possible rather than general statements. Express certainty levels
+            for different aspects of your analysis (e.g., "High confidence: 80-90%").
             """,
                 ),
                 ("human", "{question}"),
