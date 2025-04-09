@@ -238,11 +238,3 @@ Poetry handles building standard Python packages.
 *   Configure CORS (`allow_origins` in `app/config.py`) restrictively.
 *   Consider a reverse proxy (Nginx, Traefik) for SSL, load balancing, etc.
 *   The included `cd.yml` workflow provides an example of deploying via AWS CDK.
-
-## Contributing
-
-[Optional: Add guidelines for contributing if this is an open project.]
-
-## License
-
-[Optional: Specify the project's license, e.g., MIT, Apache 2.0.]

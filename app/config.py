@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     api_key: str | None = Field(None, alias="API_KEY")  # For production auth
     environment: str = Field("development", alias="ENVIRONMENT")
     sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
-    model_name: str = Field("gpt-4o-mini", alias="MODEL_NAME")
+    model_name: str = Field("gpt-4o", alias="MODEL_NAME")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     mocks_dir_name: str = Field("data", alias="MOCKS_DIR_NAME")
     cors_origins: List[str] = Field(

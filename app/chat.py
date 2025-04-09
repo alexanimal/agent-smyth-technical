@@ -65,7 +65,7 @@ class ChatRouter:
             query: The user's query
 
         Returns:
-            str: Classification result ("investment", "trading_thesis", or "general")
+            str: Classification result ("investment", "trading_thesis", "general", or "technical")
 
         Raises:
             None: Defaults to "general" if classification fails
@@ -81,7 +81,7 @@ class ChatRouter:
 
         # Ensure we get a valid classification
         classification = classification.strip().lower()
-        if classification not in ["investment", "trading_thesis", "general"]:
+        if classification not in ["investment", "trading_thesis", "general", "technical"]:
             # Default to general if classification is unclear
             logger.warning(f"Invalid classification: {classification}, defaulting to 'general'")
             classification = "general"
@@ -112,7 +112,7 @@ class ChatHandler:
     def __init__(
         self,
         knowledge_base: VectorStore,
-        model_name: str = "gpt-4o-mini",
+        model_name: str = "gpt-4o",
         temperature: float = 0,
         max_retries: int = 3,
         retry_delay: float = 1.0,
@@ -177,7 +177,7 @@ class ChatHandler:
         """
         if self._router is None:
             # Use a smaller, faster model for classification
-            classifier_model = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+            classifier_model = ChatOpenAI(model="gpt-4o", temperature=0.0)
             self._router = ChatRouter(classifier_model)
         return self._router
 

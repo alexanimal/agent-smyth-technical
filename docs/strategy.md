@@ -86,3 +86,29 @@ I implemented several features to ensure system reliability:
 - Grace period configuration for proper initialization
 - Sentry integration for error tracking and performance monitoring
 - Structured logging for debugging and analysis
+
+## System Implementation Screenshots
+
+### CI/CD Pipeline
+![Github Actions](gh-ci.png "Github Actions")
+This screenshot shows our Github Actions CI/CD pipeline that automatically tests, builds, and prepares the application for deployment. The workflow includes automated unit tests, integration tests, and security scanning to ensure code quality and reliability before deployment.
+
+### Continuous Deployment
+![AWS Deploy](awsdeploy.png "AWS CD")
+Our continuous deployment process to AWS, showing a successful deployment of the microservice. This automated process ensures zero-downtime deployments by using a blue/green deployment strategy for the ECS Fargate service.
+
+### Infrastructure as Code
+![AWS CDK](awscdk.png "AWS CDK")
+The AWS CDK implementation defining our cloud infrastructure as TypeScript code. This approach provides consistent, version-controlled infrastructure that can be reviewed, tested, and deployed alongside the application code.
+
+### Error Monitoring
+![Sentry Dashboard](sentry.png "Sentry Monitoring Dashboard")
+The Sentry dashboard provides real-time visibility into application errors and exceptions. This allows us to quickly identify and resolve issues that might affect the quality of trading recommendations.
+
+### Performance Monitoring
+![Sentry Dashboard](traces.png "Performance Traces")
+Performance traces showing request processing time across different components of the system. These traces help identify bottlenecks in the RAG pipeline, allowing us to optimize the retrieval and generation processes for faster response times.
+
+### User Interface
+![Simple Chat Interface](simpleui.png "Basic UI to interact with API")
+A simple chat interface that portfolio managers can use to interact with the trading ideas API. This interface provides a conversational experience while leveraging the sophisticated RAG system in the background to generate high-quality trading recommendations.
