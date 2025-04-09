@@ -139,14 +139,20 @@ class TestChatRouter:
         """Test that the router correctly classifies investment queries."""
         # Arrange
         query = "What's the sentiment on Tesla?"
-        # Set up the mock to return "investment"
-        mock_classifier_model.ainvoke = AsyncMock(return_value="investment")
+        # Set up the mock to return JSON output with confidence scores
+        mock_classifier_model.ainvoke = AsyncMock(
+            return_value='{"investment": 80, "technical": 10, "trading_thesis": 5, "general": 5}'
+        )
 
         # Act
         result = await router.classify_query(query)
 
         # Assert
-        assert result == "investment"
+        assert isinstance(result, dict)
+        assert "query_type" in result
+        assert "confidence_scores" in result
+        assert result["query_type"] == "investment"
+        assert result["confidence_scores"]["investment"] == 80
         mock_classifier_model.ainvoke.assert_called_once()
 
     @pytest.mark.asyncio
@@ -154,14 +160,20 @@ class TestChatRouter:
         """Test that the router correctly classifies technical analysis queries."""
         # Arrange
         query = "What do the RSI and MACD indicators suggest for Tesla right now?"
-        # Set up the mock to return "technical"
-        mock_classifier_model.ainvoke = AsyncMock(return_value="technical")
+        # Set up the mock to return JSON output with confidence scores
+        mock_classifier_model.ainvoke = AsyncMock(
+            return_value='{"technical": 75, "investment": 15, "trading_thesis": 5, "general": 5}'
+        )
 
         # Act
         result = await router.classify_query(query)
 
         # Assert
-        assert result == "technical"
+        assert isinstance(result, dict)
+        assert "query_type" in result
+        assert "confidence_scores" in result
+        assert result["query_type"] == "technical"
+        assert result["confidence_scores"]["technical"] == 75
         mock_classifier_model.ainvoke.assert_called_once()
 
     @pytest.mark.asyncio
@@ -169,14 +181,89 @@ class TestChatRouter:
         """Test that invalid classifications default to 'general'."""
         # Arrange
         query = "Random general query"
-        # Set up the mock to return an invalid classification type
-        mock_classifier_model.ainvoke = AsyncMock(return_value="invalid_type")
+        # Set up the mock to return invalid JSON
+        mock_classifier_model.ainvoke = AsyncMock(return_value="invalid_json_format")
 
         # Act
         result = await router.classify_query(query)
 
         # Assert
-        assert result == "general"  # Should default to general
+        assert isinstance(result, dict)
+        assert result["query_type"] == "general"  # Should default to general
+        assert (
+            result["confidence_scores"]["general"] == 100
+        )  # Should have 100% confidence in default
+        mock_classifier_model.ainvoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_query_trading_thesis(self, router, mock_classifier_model):
+        """Test that the router correctly classifies trading thesis queries."""
+        # Arrange
+        query = "Can you develop a trading thesis for Bitcoin based on recent tweets?"
+        # Set up the mock to return JSON output with confidence scores
+        mock_classifier_model.ainvoke = AsyncMock(
+            return_value='{"trading_thesis": 70, "investment": 20, "technical": 5, "general": 5}'
+        )
+
+        # Act
+        result = await router.classify_query(query)
+
+        # Assert
+        assert isinstance(result, dict)
+        assert "query_type" in result
+        assert "confidence_scores" in result
+        assert result["query_type"] == "trading_thesis"
+        assert result["confidence_scores"]["trading_thesis"] == 70
+        mock_classifier_model.ainvoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_query_mixed(self, router, mock_classifier_model):
+        """Test that the router correctly identifies mixed queries with multiple high confidence scores."""
+        # Arrange
+        query = "What do the technical indicators suggest for Tesla and is it a good investment?"
+        # Set up the mock to return JSON with multiple high confidence scores
+        mock_classifier_model.ainvoke = AsyncMock(
+            return_value='{"technical": 55, "investment": 40, "trading_thesis": 3, "general": 2}'
+        )
+
+        # Act
+        result = await router.classify_query(query)
+
+        # Assert
+        assert isinstance(result, dict)
+        assert "query_type" in result
+        assert "confidence_scores" in result
+        assert "is_mixed" in result
+        assert result["query_type"] == "technical"  # Highest confidence
+        assert result["confidence_scores"]["technical"] == 55
+        assert result["confidence_scores"]["investment"] == 40
+        assert result["is_mixed"] == True  # Should be identified as mixed since investment > 30
+        mock_classifier_model.ainvoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_query_not_mixed(self, router, mock_classifier_model):
+        """Test that the router correctly identifies non-mixed queries with one dominant confidence score."""
+        # Arrange
+        query = "What is the RSI for Tesla stock right now?"
+        # Set up the mock to return JSON with one high confidence score
+        mock_classifier_model.ainvoke = AsyncMock(
+            return_value='{"technical": 85, "investment": 10, "trading_thesis": 3, "general": 2}'
+        )
+
+        # Act
+        result = await router.classify_query(query)
+
+        # Assert
+        assert isinstance(result, dict)
+        assert "query_type" in result
+        assert "confidence_scores" in result
+        assert "is_mixed" in result
+        assert result["query_type"] == "technical"  # Highest confidence
+        assert result["confidence_scores"]["technical"] == 85
+        assert result["confidence_scores"]["investment"] == 10
+        assert (
+            result["is_mixed"] == False
+        )  # Should not be identified as mixed since investment < 30
         mock_classifier_model.ainvoke.assert_called_once()
 
 
@@ -336,7 +423,13 @@ class TestChatHandler:
 
         # Mock the main components instead of the whole process_query flow
         mock_router = AsyncMock()
-        mock_router.classify_query = AsyncMock(return_value="investment")
+        mock_router.classify_query = AsyncMock(
+            return_value={
+                "query_type": "investment",
+                "confidence_scores": {"investment": 90, "general": 10},
+                "is_mixed": False,
+            }
+        )
         chat_handler._router = mock_router
 
         # Skip the actual implementation and return the expected result
@@ -384,7 +477,13 @@ class TestChatHandler:
 
         # Setup router mock
         mock_router = AsyncMock()
-        mock_router.classify_query = AsyncMock(return_value="general")
+        mock_router.classify_query = AsyncMock(
+            return_value={
+                "query_type": "general",
+                "confidence_scores": {"general": 100},
+                "is_mixed": False,
+            }
+        )
 
         # Setup retriever mock
         mock_retriever = AsyncMock()
@@ -590,7 +689,13 @@ class TestChatHandler:
 
         # Mock the router to classify as technical
         mock_router = AsyncMock()
-        mock_router.classify_query = AsyncMock(return_value="technical")
+        mock_router.classify_query = AsyncMock(
+            return_value={
+                "query_type": "technical",
+                "confidence_scores": {"technical": 100},
+                "is_mixed": False,
+            }
+        )
         chat_handler._router = mock_router
 
         # Mock the technical LLM
@@ -712,7 +817,13 @@ async def test_process_query_default_to_general():
     """Test that process_query defaults to general when classification is invalid."""
     # Mock router's classify_query to return invalid classification
     mock_router = AsyncMock()
-    mock_router.classify_query = AsyncMock(return_value="invalid_type")
+    mock_router.classify_query = AsyncMock(
+        return_value={
+            "query_type": "invalid_type",
+            "confidence_scores": {"invalid_type": 100},
+            "is_mixed": False,
+        }
+    )
 
     # Create a handler using our mock
     handler = ChatHandler(knowledge_base=MagicMock())
@@ -970,7 +1081,13 @@ async def test_process_query_simplified():
 
     # Setup router mock that records the classify_query call
     mock_router = AsyncMock()
-    mock_router.classify_query = AsyncMock(return_value="general")
+    mock_router.classify_query = AsyncMock(
+        return_value={
+            "query_type": "general",
+            "confidence_scores": {"general": 100},
+            "is_mixed": False,
+        }
+    )
 
     # Create handler with mocked properties
     handler = ChatHandler(knowledge_base=mock_kb)
@@ -990,7 +1107,8 @@ async def test_process_query_simplified():
             handler._router = handler._router or mock_router
 
             # This calls the router we mocked
-            query_type = await handler._router.classify_query(message)
+            classification = await handler._router.classify_query(message)
+            query_type = classification["query_type"]
 
             # This calls as_retriever which we're tracking
             retriever = handler.knowledge_base.as_retriever(search_kwargs={"k": k * 2})

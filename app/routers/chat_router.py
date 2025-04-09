@@ -36,11 +36,17 @@ async def handle_chat(
     Process a chat message and return a response using Retrieval Augmented Generation (RAG).
 
     - **message**: The user's query text (required). Length/content validation applies.
-    - **num_results**: Number of sources to retrieve (default: 5, max: 100).
+    - **num_results**: Number of sources to retrieve (default: 25, max: 250).
     - **context**: Optional contextual information.
     - **model**: Optional override for the LLM model.
 
     Requires a valid API key via `X-API-Key` header in production.
+
+    Returns a response that includes:
+    - Primary analysis based on retrieved sources
+    - Alternative viewpoints for balanced perspective (when applicable)
+    - Confidence scores for query classification
+    - Source attribution for transparency
     """
     request_id = x_request_id or str(uuid4())
     start_time = time.time()
@@ -74,6 +80,7 @@ async def handle_chat(
                 "model_used", settings.model_name
             ),  # Get model used from result if available
             "query_type": result.get("query_type", "unknown"),
+            "confidence_scores": result.get("confidence_scores", {}),
             "client_info": {
                 "user_agent": user_agent,
                 "ip": fastapi_request.client.host if fastapi_request.client else "unknown",
@@ -88,6 +95,9 @@ async def handle_chat(
             response=result["response"],
             sources=result["sources"],
             processing_time=result.get("processing_time"),  # Use time from service if available
+            alternative_viewpoints=result.get(
+                "alternative_viewpoints"
+            ),  # Include alternative perspectives
             metadata=response_metadata,
             # Timestamp added automatically by Pydantic
         )

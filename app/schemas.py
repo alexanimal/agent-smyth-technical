@@ -60,7 +60,12 @@ class ChatRequest(BaseModel):
         description="The user's query text",
         json_schema_extra={"example": "What are investors saying about AAPL?"},
     )
-    num_results: int = Field(100, ge=1, le=500, description="Number of sources to retrieve")
+    num_results: int = Field(
+        25,
+        ge=1,
+        le=250,
+        description="Number of sources to retrieve and consider in analysis. Higher values provide more comprehensive analysis but may increase processing time. Recommended ranges: 5-25 for quick queries, 25-100 for detailed analysis, 100-250 for comprehensive market research.",
+    )
     query_type: Optional[QueryType] = Field(
         None, description="Override automatic query classification"
     )
@@ -82,7 +87,7 @@ class ChatRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "message": "What are the recent trends for AAPL stock?",
-                "num_results": 100,
+                "num_results": 25,
                 # "context": {"session_id": "user123"},
                 # "model": "gpt-4o",
             }
@@ -123,6 +128,7 @@ class ChatResponse(BaseModel):
         sources: List of source URLs that contributed to the response
         processing_time: Time taken to process the request in seconds
         timestamp: When the response was generated
+        alternative_viewpoints: Optional counter-narrative to provide balanced perspective
         metadata: Additional metadata about the response and processing
     """
 
@@ -131,6 +137,9 @@ class ChatResponse(BaseModel):
     sources: List[str] = []
     processing_time: Optional[float] = None
     timestamp: datetime = Field(default_factory=datetime.now)
+    alternative_viewpoints: Optional[str] = Field(
+        None, description="Alternative perspective or counter-argument for balanced view"
+    )
     metadata: Dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata about the response"
     )
@@ -147,7 +156,18 @@ class ChatResponse(BaseModel):
                 ],
                 "processing_time": 1.24,
                 "timestamp": "2023-04-28T14:23:15.123456",
-                "metadata": {"model_used": "gpt-4", "token_count": 423},
+                "alternative_viewpoints": "While Apple shows positive momentum, there are risks of market saturation...",
+                "metadata": {
+                    "model_used": "gpt-4",
+                    "token_count": 423,
+                    "query_type": "investment",
+                    "confidence_scores": {
+                        "investment": 75,
+                        "technical": 20,
+                        "trading_thesis": 5,
+                        "general": 0,
+                    },
+                },
             }
         }
     )
