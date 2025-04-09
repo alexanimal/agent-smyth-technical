@@ -12,34 +12,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install UV
-RUN curl -sSf https://install.ultraviolet.dev | sh
-ENV PATH="/root/.cargo/bin:${PATH}"
+# Install Poetry
+RUN pip install poetry
+
+# Configure Poetry
+RUN poetry config virtualenvs.create false
 
 # Copy project configuration
-COPY pyproject.toml README.md ./
+COPY pyproject.toml poetry.lock README.md ./
 
 # Copy source code
 COPY app/ ./app/
 COPY data/ ./data/
-COPY .env ./
 
 # Create directory for the FAISS index
 RUN mkdir -p /app/faiss_index && chmod 777 /app/faiss_index
 
-# Install dependencies with UV
-RUN pip install .
+# Install dependencies with Poetry
+RUN poetry install --without dev --no-root
 
 # Create entry script
 RUN echo '#!/bin/bash\n\
 set -e\n\
-# Load environment variables from .env file\n\
-export $(grep -v "^#" /app/.env | xargs)\n\
-# Start the application\n\
+# Start the application on the correct port
+\
 exec uvicorn app.main:app --host 0.0.0.0 --port 8002\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
-# Expose port
+# Expose the correct port
 EXPOSE 8002
 
 # Run app

@@ -1,5 +1,6 @@
 /venv
 .env
+.env.local
 faiss_index/
 __pycache__
 .pytest_cache

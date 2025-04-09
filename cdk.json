@@ -11,7 +11,8 @@
       "cdk*.json",
       "requirements*.txt",
       "**/__pycache__",
-      "tests"
+      "tests",
+      "venv"
     ]
   },
   "context": {

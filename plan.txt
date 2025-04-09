@@ -11,3 +11,9 @@ The data that needs to be read into the Knowledge Base is in the data folder in 
 Use langchain and JSONLoader and jq to process the large json files. Batch where necessary.
 
 Create and Agent associated with our Knowledge Base Documents and query the knowledge base for the user input.
+
+
+- CD (UI App and Coverage)
+- CI (hook up CodeCov)
+- Add more Github Actions
+- 
