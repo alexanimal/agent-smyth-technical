@@ -88,7 +88,7 @@ def test_chat_endpoint(setup_mocks):
     # which we already mocked in setup_mocks. No need to patch the dependency getter itself.
     response = client.post(
         "/chat",
-        headers={"User-Agent": "pytest-client", "X-API-Key": TEST_API_KEY}, # Add API key header
+        headers={"User-Agent": "pytest-client", "X-API-Key": TEST_API_KEY},  # Add API key header
         json={"message": "Test message", "num_results": 3},
     )
 
@@ -118,8 +118,8 @@ def test_chat_endpoint_error(setup_mocks):
     # No need to patch the dependency getter
     response = client.post(
         "/chat",
-        headers={"X-API-Key": TEST_API_KEY}, # Add API key header
-        json={"message": "Test message"}
+        headers={"X-API-Key": TEST_API_KEY},  # Add API key header
+        json={"message": "Test message"},
     )
 
     # Check error response

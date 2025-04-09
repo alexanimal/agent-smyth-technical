@@ -207,7 +207,13 @@ class TestPromptManager:
         # Assert
         # Check chat history is included in the formatted messages
         # Ensure only string content is joined
-        all_content = " ".join([msg.content for msg in formatted if hasattr(msg, "content") and isinstance(msg.content, str)])
+        all_content = " ".join(
+            [
+                msg.content
+                for msg in formatted
+                if hasattr(msg, "content") and isinstance(msg.content, str)
+            ]
+        )
         assert "What do you think about Tesla?" in all_content
         assert "Based on the tweets, sentiment is positive." in all_content
 
