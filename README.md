@@ -65,10 +65,10 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
 To run the FastAPI application locally for development:
 
 ```bash
-uvicorn src.main:app --host localhost --port 8002 --reload
+uvicorn app.main:app --host localhost --port 8002 --reload
 ```
 
-*   `src.main:app`: Points to the FastAPI `app` instance in `src/main.py`.
+*   `app.main:app`: Points to the FastAPI `app` instance in `app/main.py`.
 *   `--host localhost`: Makes the server available only on your local machine.
 *   `--port 8002`: Specifies the port to run on.
 *   `--reload`: Enables auto-reloading when code changes are detected.
@@ -119,7 +119,7 @@ export PYTHONPATH=$(pwd):$PYTHONPATH # Linux/macOS
 pytest tests/
 
 # Run tests with coverage report
-pytest --cov=src tests/
+pytest --cov=app tests/
 ```
 
 ## Building and Packaging
@@ -154,7 +154,7 @@ This is the standard way to package web applications for deployment.
     RUN pip install --no-cache-dir -r requirements.txt
 
     # Copy the application code into the container
-    COPY ./src /app/src
+    COPY ./app /app/app
     # Copy mocks and potentially the pre-built index if desired
     # COPY ./__mocks__ /app/__mocks__
     # COPY ./faiss_index /app/faiss_index
@@ -169,7 +169,7 @@ This is the standard way to package web applications for deployment.
 
     # Run uvicorn server when the container launches
     # Use 0.0.0.0 to listen on all available interfaces inside the container
-    CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
     ```
 
 *   **Build the Docker Image:**
@@ -254,7 +254,7 @@ This creates standard Python package files (`.whl`, `.tar.gz`) which can be inst
     ```
     This will create a `dist` directory containing a `.whl` (wheel) file and a `.tar.gz` (source distribution) file.
 
-*   **Usage:** While you *can* install this package (`pip install dist/tweet_rag_api-1.0.0-py3-none-any.whl`), you still need a separate process (like `uvicorn src.main:app ...`) to run the actual web server. This is why Docker is generally preferred for deploying web applications.
+*   **Usage:** While you *can* install this package (`pip install dist/tweet_rag_api-1.0.0-py3-none-any.whl`), you still need a separate process (like `uvicorn app.main:app ...`) to run the actual web server. This is why Docker is generally preferred for deploying web applications.
 
 ## Deployment Notes
 

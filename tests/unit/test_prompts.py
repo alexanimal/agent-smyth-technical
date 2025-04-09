@@ -1,12 +1,12 @@
 """
-Unit tests for the PromptManager class in src.prompts
+Unit tests for the PromptManager class in app.prompts
 """
 import pytest
 from typing import Dict, Any
 from unittest.mock import patch, MagicMock, AsyncMock
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.prompts.chat import SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from src.prompts import PromptManager
+from app.prompts import PromptManager
 
 
 def assert_message_contains(message, text: str):

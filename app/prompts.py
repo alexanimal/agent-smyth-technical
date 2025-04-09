@@ -12,8 +12,8 @@ class PromptManager:
         return ChatPromptTemplate.from_messages([
             ("system", """
             You are a financial advisor. Based on the tweet data provided, respond with ONLY ONE WORD:
-            - "Buy" if the sentiment suggests buying would be profitable
-            - "Sell" if the sentiment suggests selling would be wise
+            - "Long" if the sentiment suggests buying would be profitable
+            - "Short" if the sentiment suggests selling would be wise
             - "Hold" if the sentiment is neutral or unclear
             
             Do not provide any other text, explanation, or context. Just the single word.

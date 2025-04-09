@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 # Import the target functionality
-from src.kb import get_project_root, KnowledgeBaseManager, MOCKS_DIR, PROJECT_ROOT
+from app.kb import get_project_root, KnowledgeBaseManager, MOCKS_DIR, PROJECT_ROOT
 
 
 class TestPathResolution(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestPathResolution(unittest.TestCase):
         
         # Patch the exists method on the Path class
         with patch('pathlib.Path.exists', mock_exists), \
-             patch('os.path.abspath', return_value='/fake/path/src/knowledge_base.py'):
+             patch('os.path.abspath', return_value='/fake/path/app/knowledge_base.py'):
             
             # Run the function with mocks in place
             root = get_project_root()
@@ -61,14 +61,14 @@ class TestPathResolution(unittest.TestCase):
             if '/fake/path/__mocks__' in path_str:
                 return False
             # But make strategy 2 succeed
-            if '/current/work/dir/__mocks__' in path_str or '/current/work/dir/src' in path_str:
+            if '/current/work/dir/__mocks__' in path_str or '/current/work/dir/app' in path_str:
                 return True
             # For any other paths, use the original exists method
             return original_exists(self)
         
         # Apply the mocks
         with patch('pathlib.Path.exists', mock_exists), \
-             patch('os.path.abspath', return_value='/fake/path/src/knowledge_base.py'), \
+             patch('os.path.abspath', return_value='/fake/path/app/knowledge_base.py'), \
              patch('pathlib.Path.cwd', return_value=Path('/current/work/dir')):
                 
             # Run the function with mocks in place
@@ -88,17 +88,17 @@ class TestPathResolution(unittest.TestCase):
             # Make strategies 1 and 2 fail
             if '/some/other/path/__mocks__' in path_str or '/unrelated/dir/__mocks__' in path_str:
                 return False
-            if '/unrelated/dir/src' in path_str:
+            if '/unrelated/dir/app' in path_str:
                 return False
             # But make strategy 3 succeed
-            if '/parent/dir/__mocks__' in path_str or '/parent/dir/src' in path_str:
+            if '/parent/dir/__mocks__' in path_str or '/parent/dir/app' in path_str:
                 return True
             # For any other paths, use the original exists method
             return original_exists(self)
         
         # Apply the mocks
         with patch('pathlib.Path.exists', mock_exists), \
-             patch('os.path.abspath', return_value='/some/other/path/src/knowledge_base.py'), \
+             patch('os.path.abspath', return_value='/some/other/path/app/knowledge_base.py'), \
              patch('pathlib.Path.cwd', return_value=Path('/parent/dir/subdir')):
                 
             # Run the function with mocks in place
@@ -118,17 +118,17 @@ class TestPathResolution(unittest.TestCase):
             # Make strategies 1, 2, and 3 fail
             if any(x in path_str for x in ['/some/other/path/__mocks__', '/unrelated/dir/__mocks__']):
                 return False
-            if any(x in path_str for x in ['/unrelated/dir/src', '/unrelated/dir/parent/__mocks__']):
+            if any(x in path_str for x in ['/unrelated/dir/app', '/unrelated/dir/parent/__mocks__']):
                 return False
             # But make strategy 4 succeed for the second path in sys.path
-            if '/python/lib/site-packages/__mocks__' in path_str or '/python/lib/site-packages/src' in path_str:
+            if '/python/lib/site-packages/__mocks__' in path_str or '/python/lib/site-packages/app' in path_str:
                 return True
             # For any other paths, use the original exists method
             return original_exists(self)
         
         # Apply the mocks
         with patch('pathlib.Path.exists', mock_exists), \
-             patch('os.path.abspath', return_value='/some/other/path/src/knowledge_base.py'), \
+             patch('os.path.abspath', return_value='/some/other/path/app/knowledge_base.py'), \
              patch('pathlib.Path.cwd', return_value=Path('/unrelated/dir')), \
              patch.object(sys, 'path', ['/wrong/path', '/python/lib/site-packages']):
                 
@@ -142,7 +142,7 @@ class TestPathResolution(unittest.TestCase):
     def test_fallback_strategy(self):
         """Test the fallback strategy."""
         with patch('pathlib.Path.exists', return_value=False):  # All other strategies fail
-            with patch('os.path.abspath', return_value='/fallback/path/src/knowledge_base.py'):
+            with patch('os.path.abspath', return_value='/fallback/path/app/knowledge_base.py'):
                 root = get_project_root()
                 self.assertEqual(str(root), '/fallback/path', 
                                 "Fallback strategy didn't return two levels up from file")

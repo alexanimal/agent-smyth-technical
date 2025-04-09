@@ -5,7 +5,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch, call
 
-from src.chat import ChatRouter, ChatHandler
+from app.chat import ChatRouter, ChatHandler
 
 @pytest.mark.asyncio
 async def test_process_query_with_max_retries():
@@ -23,8 +23,8 @@ async def test_process_query_with_max_retries():
     with patch.object(handler, '_get_trading_thesis_prompt') as mock_get_prompt, \
          patch.object(handler, '_create_qa_chain') as mock_create_chain, \
          patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep, \
-         patch('src.chat.logger.warning') as mock_warning, \
-         patch('src.chat.logger.error') as mock_error:
+         patch('app.chat.logger.warning') as mock_warning, \
+         patch('app.chat.logger.error') as mock_error:
         
         # Set up chain to always fail
         mock_get_prompt.return_value = MagicMock()
@@ -80,7 +80,7 @@ async def test_process_query_trading_thesis():
     with patch.object(handler, '_get_trading_thesis_prompt') as mock_get_prompt, \
          patch.object(handler, '_create_qa_chain') as mock_create_chain, \
          patch('time.time', side_effect=[100.0, 101.0, 102.0, 103.0]), \
-         patch('src.chat.logger') as mock_logger:  # Mock logger to prevent issues
+         patch('app.chat.logger') as mock_logger:  # Mock logger to prevent issues
     
         # Set up mock chain
         mock_get_prompt.return_value = MagicMock()
@@ -138,7 +138,7 @@ async def test_process_query_default_to_general():
     with patch.object(handler, '_get_general_prompt') as mock_get_prompt, \
          patch.object(handler, '_create_qa_chain') as mock_create_chain, \
          patch('time.time', side_effect=[100.0, 101.0]), \
-         patch('src.chat.logger.warning') as mock_warning:
+         patch('app.chat.logger.warning') as mock_warning:
     
         # Set up mock chain
         mock_get_prompt.return_value = MagicMock()

@@ -59,7 +59,7 @@ class ApiStack(Stack):
         handler = lambda_.Function(
             self, f"{id}-Lambda",
             runtime=lambda_.Runtime.PYTHON_3_10,
-            code=lambda_.Code.from_asset("src"),
+            code=lambda_.Code.from_asset("app"),
             handler="main.handler",
             environment={
                 "ENVIRONMENT": env_config.env_name,

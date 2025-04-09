@@ -13,7 +13,7 @@ from langchain_core.vectorstores import VectorStore
 from langchain_core.language_models import BaseChatModel
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
-from src.prompts import PromptManager
+from app.prompts import PromptManager
 
 # Configure logging
 logger = logging.getLogger(__name__)

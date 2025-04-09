@@ -20,7 +20,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 COPY pyproject.toml README.md ./
 
 # Copy source code
-COPY src/ ./src/
+COPY app/ ./app/
 COPY __mocks__/ ./__mocks__/
 COPY .env ./
 
@@ -36,7 +36,7 @@ set -e\n\
 # Load environment variables from .env file\n\
 export $(grep -v "^#" /app/.env | xargs)\n\
 # Start the application\n\
-exec uvicorn src.main:app --host 0.0.0.0 --port 8002\n\
+exec uvicorn app.main:app --host 0.0.0.0 --port 8002\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Expose port

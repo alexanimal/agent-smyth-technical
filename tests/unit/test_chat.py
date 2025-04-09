@@ -8,8 +8,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore
 
-from src.chat import ChatRouter, ChatHandler
-from src.prompts import PromptManager
+from app.chat import ChatRouter, ChatHandler
+from app.prompts import PromptManager
 
 
 class MockDocument:
@@ -151,7 +151,7 @@ class TestChatRouter:
         # Act
         with patch.object(PromptManager, 'get_classification_prompt', return_value=prompt_mock):
             with patch('langchain_core.output_parsers.StrOutputParser'):
-                with patch('src.chat.logger.warning') as mock_logger:
+                with patch('app.chat.logger.warning') as mock_logger:
                     result = await router.classify_query(query)
                     
                     # Assert
@@ -178,7 +178,7 @@ class TestChatHandler:
     @pytest.fixture
     def chat_handler(self, mock_knowledge_base):
         """Create a ChatHandler instance for testing."""
-        with patch('src.chat.ChatOpenAI') as mock_chat_openai:
+        with patch('app.chat.ChatOpenAI') as mock_chat_openai:
             mock_chat_openai.return_value = MockChatOpenAI(model="test-model")
             handler = ChatHandler(
                 knowledge_base=mock_knowledge_base,
@@ -195,7 +195,7 @@ class TestChatHandler:
         mock_kb = EnhancedMockVectorStore()
         
         # Act
-        with patch('src.chat.ChatOpenAI') as mock_chat_openai:
+        with patch('app.chat.ChatOpenAI') as mock_chat_openai:
             mock_chat_openai.return_value = MockChatOpenAI(model="test-model")
             handler = ChatHandler(knowledge_base=mock_kb, model_name="test-model")
             
@@ -219,8 +219,8 @@ class TestChatHandler:
         mock_kb = EnhancedMockVectorStore()
         
         # Act
-        with patch('src.chat.ChatRouter') as mock_router_class:
-            with patch('src.chat.ChatOpenAI') as mock_chat_openai:
+        with patch('app.chat.ChatRouter') as mock_router_class:
+            with patch('app.chat.ChatOpenAI') as mock_chat_openai:
                 handler = ChatHandler(knowledge_base=mock_kb)
                 
                 # Assert - Router should not be initialized yet
@@ -268,12 +268,11 @@ class TestChatHandler:
         chat_handler.knowledge_base = enhanced_mock_store
         
         # Act
-        with patch('src.chat.RetrievalQA') as mock_retrieval_qa:
-            # Configure the RetrievalQA mock to return our chain
+        with patch('app.chat.RetrievalQA') as mock_retrieval_qa:
             mock_retrieval_qa.from_chain_type.return_value = mock_qa_chain
-            
-            # Call the actual method without patching it
-            result = await chat_handler._create_qa_chain(mock_prompt, k)
+
+            # Call the method synchronously (remove await)
+            result = chat_handler._create_qa_chain(mock_prompt, k)
             
             # Assert
             mock_retrieval_qa.from_chain_type.assert_called_once()
@@ -389,8 +388,8 @@ class TestChatHandler:
         with patch.object(chat_handler, '_get_general_prompt'):
             with patch.object(chat_handler, '_create_qa_chain', return_value=mock_qa_chain):
                 with patch('asyncio.sleep', new_callable=AsyncMock):
-                    with patch('src.chat.logger.warning') as mock_warning:
-                        with patch('src.chat.logger.error') as mock_error:
+                    with patch('app.chat.logger.warning') as mock_warning:
+                        with patch('app.chat.logger.error') as mock_error:
                             with pytest.raises(Exception) as excinfo:
                                 await chat_handler.process_query(message)
                             
