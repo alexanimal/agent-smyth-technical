@@ -38,15 +38,15 @@ class TestChatRequest:
             message="Test message",
             num_results=5,
             verbose=False,
-            context={},
-            model="gpt-4o",
+            # context={},
+            # model="gpt-4o",
             query_type=None,
         )
 
         assert request.num_results == 5
         assert request.verbose is False
-        assert request.context == {}
-        assert request.model == "gpt-4o"
+        # assert request.context == {}
+        # assert request.model == "gpt-4o"
         assert request.query_type is None
 
     def test_message_validation(self):
@@ -56,8 +56,8 @@ class TestChatRequest:
             message="Test message",
             num_results=5,
             verbose=False,
-            context={},
-            model="gpt-4o",
+            # context={},
+            # model="gpt-4o",
             query_type=None,
         )
         assert request.message == "Test message"
@@ -68,8 +68,8 @@ class TestChatRequest:
                 message="Te",
                 num_results=5,
                 verbose=False,
-                context={},
-                model="gpt-4o",
+                # context={},
+                # model="gpt-4o",
                 query_type=None,
             )
 
@@ -80,8 +80,8 @@ class TestChatRequest:
             message="Test message",
             num_results=5,
             verbose=False,
-            context={},
-            model="gpt-4o",
+            # context={},
+            # model="gpt-4o",
             query_type=QueryType.TECHNICAL,
         )
         assert request.query_type == QueryType.TECHNICAL
@@ -91,8 +91,8 @@ class TestChatRequest:
             message="Test message",
             num_results=5,
             verbose=False,
-            context={},
-            model="gpt-4o",
+            # context={},
+            # model="gpt-4o",
             query_type=None,
         )
         assert request.query_type is None

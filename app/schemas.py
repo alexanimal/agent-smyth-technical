@@ -60,7 +60,7 @@ class ChatRequest(BaseModel):
         description="The user's query text",
         json_schema_extra={"example": "What are investors saying about AAPL?"},
     )
-    num_results: int = Field(100, ge=1, le=100, description="Number of sources to retrieve")
+    num_results: int = Field(100, ge=1, le=500, description="Number of sources to retrieve")
     query_type: Optional[QueryType] = Field(
         None, description="Override automatic query classification"
     )
