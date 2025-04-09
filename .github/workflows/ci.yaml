@@ -52,7 +52,9 @@ jobs:
       - name: Install dependencies
         # Install all dependencies including dev groups
         # Use --sync if you want exact lock file versions, omit if you want potential updates within constraints
-        run: poetry install --with dev
+        run: |
+          poetry install --with dev
+          poetry run pip install coverage pytest-cov
 
       - name: Run linting and formatting checks
         run: |
@@ -64,9 +66,10 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          poetry run pytest --cov=app # Run tests and generate coverage report
+          poetry run pytest --cov=app --cov-report=json
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.json
