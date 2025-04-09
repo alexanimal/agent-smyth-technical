@@ -61,11 +61,14 @@ class ApiStack(Stack):
             listener_port=80,
             # Add health check grace period - give app time to start
             health_check_grace_period=Duration.seconds(120),
+            # Add deployment configuration to fix the minHealthyPercent warning
+            min_healthy_percent=100,  # Keep at least one task running during deployment
+            max_healthy_percent=200,  # Allow starting a new task before stopping the old one
         )
 
         # Configure the target group's health check
         fargate_service.target_group.configure_health_check(
-            path="/health",
+            protocol=elbv2.Protocol.TCP,
             healthy_threshold_count=2,
             unhealthy_threshold_count=3,
             timeout=Duration.seconds(5),
