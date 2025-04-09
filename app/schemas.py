@@ -60,30 +60,31 @@ class ChatRequest(BaseModel):
         description="The user's query text",
         json_schema_extra={"example": "What are investors saying about AAPL?"},
     )
-    num_results: int = Field(5, ge=1, le=100, description="Number of sources to retrieve")
+    num_results: int = Field(100, ge=1, le=500, description="Number of sources to retrieve")
     query_type: Optional[QueryType] = Field(
         None, description="Override automatic query classification"
     )
     verbose: bool = Field(False, description="Whether to include detailed source information")
-    context: Optional[Dict[str, Any]] = Field(
-        default={},
-        description="Optional context information for the query",
-        json_schema_extra={"example": {"user_location": "US", "platform": "web"}},
-    )
-    model: Optional[str] = Field(
-        default="gpt-4o-mini",
-        description="The model to use for the query",
-        json_schema_extra={"example": "gpt-4o-mini"},
-    )
+    # TODO: Add context and model into the request so UIs can swap between models and provide additional context
+    # context: Optional[Dict[str, Any]] = Field(
+    #     default={},
+    #     description="Optional context information for the query",
+    #     json_schema_extra={"example": {"user_location": "US", "platform": "web"}},
+    # )
+    # model: Optional[str] = Field(
+    #     default="gpt-4o",
+    #     description="The model to use for the query",
+    #     json_schema_extra={"example": "gpt-4o"},
+    # )
 
     # Use model_config instead of inner Config class
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "message": "What are the recent trends for AAPL stock?",
-                "num_results": 5,
-                "context": {"session_id": "user123"},
-                "model": "gpt-4o-mini",
+                "num_results": 100,
+                # "context": {"session_id": "user123"},
+                # "model": "gpt-4o",
             }
         }
     )

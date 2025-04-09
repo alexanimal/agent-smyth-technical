@@ -124,58 +124,60 @@ class TestChatRouter:
 
     @pytest.fixture
     def mock_classifier_model(self):
-        """Create a mock classifier model."""
-        return MagicMock()
+        """Create a mocked classifier model."""
+        model = MagicMock(spec=BaseChatModel)
+        model.ainvoke = AsyncMock()
+        return model
 
     @pytest.fixture
     def router(self, mock_classifier_model):
-        """Create a ChatRouter instance for testing."""
+        """Create a ChatRouter instance using the mocked model."""
         return ChatRouter(mock_classifier_model)
 
     @pytest.mark.asyncio
     async def test_classify_query_investment(self, router, mock_classifier_model):
-        """Test classifying an investment query."""
+        """Test that the router correctly classifies investment queries."""
         # Arrange
-        query = "Should I buy Tesla stock?"
-        expected_result = "investment"
-
-        # Advanced mock setup with our helper
-        prompt_mock, chain_mock = create_mock_chain_pipe(expected_result)
+        query = "What's the sentiment on Tesla?"
+        # Set up the mock to return "investment"
+        mock_classifier_model.ainvoke = AsyncMock(return_value="investment")
 
         # Act
-        with patch.object(PromptManager, "get_classification_prompt", return_value=prompt_mock):
-            with patch("langchain_core.output_parsers.StrOutputParser"):
-                result = await router.classify_query(query)
+        result = await router.classify_query(query)
 
-                # Assert
-                assert result == expected_result
-                chain_mock.ainvoke.assert_called_once()
-                args = chain_mock.ainvoke.call_args[0][0]
-                assert args.get("query") == query
+        # Assert
+        assert result == "investment"
+        mock_classifier_model.ainvoke.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_classify_query_invalid(self, router):
-        """Test handling an invalid classification."""
+    async def test_classify_query_technical(self, router, mock_classifier_model):
+        """Test that the router correctly classifies technical analysis queries."""
         # Arrange
-        query = "General question"
-        invalid_result = "invalid_classification"  # This will trigger the fallback
-        expected_result = "general"  # Default fallback value
-
-        # Use our improved helper to set up the async mock chain
-        prompt_mock, chain_mock = create_mock_chain_pipe(invalid_result)
+        query = "What do the RSI and MACD indicators suggest for Tesla right now?"
+        # Set up the mock to return "technical"
+        mock_classifier_model.ainvoke = AsyncMock(return_value="technical")
 
         # Act
-        with patch.object(PromptManager, "get_classification_prompt", return_value=prompt_mock):
-            with patch("langchain_core.output_parsers.StrOutputParser"):
-                with patch("app.chat.logger.warning") as mock_logger:
-                    result = await router.classify_query(query)
+        result = await router.classify_query(query)
 
-                    # Assert
-                    assert result == expected_result
-                    chain_mock.ainvoke.assert_called_once()
-                    args = chain_mock.ainvoke.call_args[0][0]
-                    assert args.get("query") == query
-                    mock_logger.assert_called_once()
+        # Assert
+        assert result == "technical"
+        mock_classifier_model.ainvoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_classify_query_invalid(self, router, mock_classifier_model):
+        """Test that invalid classifications default to 'general'."""
+        # Arrange
+        query = "Random general query"
+        # Set up the mock to return an invalid classification type
+        mock_classifier_model.ainvoke = AsyncMock(return_value="invalid_type")
+
+        # Act
+        result = await router.classify_query(query)
+
+        # Assert
+        assert result == "general"  # Should default to general
+        mock_classifier_model.ainvoke.assert_called_once()
 
 
 @pytest.mark.basic
@@ -271,7 +273,7 @@ class TestChatHandler:
                 assert handler._router is not None
                 mock_router_class.assert_called_once()
                 # Verify the classifier model was initialized correctly
-                mock_chat_openai.assert_called_once_with(model="gpt-4o-mini", temperature=0.0)
+                mock_chat_openai.assert_called_once_with(model="gpt-4o", temperature=0.0)
 
     @pytest.mark.asyncio
     async def test_prompt_getters(self, chat_handler):

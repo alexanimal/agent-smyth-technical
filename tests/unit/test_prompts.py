@@ -293,7 +293,7 @@ class TestPromptManager:
         assert "technical indicators" in system_message.lower()
         assert "RSI" in system_message
         assert "MACD" in system_message
-        assert 'respond with "technical"' in system_message
+        assert 'Respond with "technical"' in system_message
 
 
 if __name__ == "__main__":

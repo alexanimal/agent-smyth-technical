@@ -13,7 +13,7 @@ export default function InputContainer() {
         if (!message.trim()) return;
         setDisabled(true);
         dispatch(addMessage({ message, id: v4(), createdAt: new Date().toISOString(), isUser: true }));
-        
+
         sendMessageToAgent(message);
         setInputMessage('');
         setDisabled(false);
@@ -28,7 +28,7 @@ export default function InputContainer() {
                 'Content-Type': 'application/json',
                 'X-API-Key': '1234567890'
             },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({ message, "num_results": 500 })
         })
         const respJson = await resp.json();
         console.log(respJson);
@@ -40,7 +40,7 @@ export default function InputContainer() {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setInputMessage(e.target.value);
     }
-    
+
     return (
 
         <div className="flex items-center justify-center p-4">

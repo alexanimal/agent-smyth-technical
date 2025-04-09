@@ -1,5 +1,7 @@
 # Tweet RAG Agent API
 
+[![codecov](https://codecov.io/github/alexanimal/agent-smyth-technical/graph/badge.svg?token=B2BI5398GF)](https://codecov.io/github/alexanimal/agent-smyth-technical)
+
 ## Overview
 
 This project provides a FastAPI-based API for a Retrieval-Augmented Generation (RAG) agent. The agent uses LangChain and OpenAI's models to answer user queries based on a knowledge base built from tweet data (expected in JSON format). It features automatic query classification, source attribution, background knowledge base loading with persistence, automated code quality checks, CI/CD pipelines, and detailed API documentation.
@@ -72,6 +74,7 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
     ```
 4.  **Prepare Tweet Data:**
     *   Ensure you have your tweet data (in JSON format, with each file containing a list of tweet objects) placed inside a directory named `data` in the project root. The `app/kb.py` script will load data from here.
+    *   This data is currently in this repository only for demonstration purposes. This would never happen in a production repository unless the data size was very small.
 
 ## Running the Application (Development)
 
@@ -238,11 +241,3 @@ Poetry handles building standard Python packages.
 *   Configure CORS (`allow_origins` in `app/config.py`) restrictively.
 *   Consider a reverse proxy (Nginx, Traefik) for SSL, load balancing, etc.
 *   The included `cd.yml` workflow provides an example of deploying via AWS CDK.
-
-## Contributing
-
-[Optional: Add guidelines for contributing if this is an open project.]
-
-## License
-
-[Optional: Specify the project's license, e.g., MIT, Apache 2.0.]
