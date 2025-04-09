@@ -74,6 +74,7 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
     ```
 4.  **Prepare Tweet Data:**
     *   Ensure you have your tweet data (in JSON format, with each file containing a list of tweet objects) placed inside a directory named `data` in the project root. The `app/kb.py` script will load data from here.
+    *   This data is currently in this repository only for demonstration purposes. This would never happen in a production repository unless the data size was very small.
 
 ## Running the Application (Development)
 
