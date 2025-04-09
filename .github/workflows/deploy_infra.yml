@@ -44,4 +44,4 @@ jobs:
           
       - name: Deploy with CDK
         run: |
-          cdk deploy --all --require-approval never
+          poetry run cdk deploy --all --require-approval never

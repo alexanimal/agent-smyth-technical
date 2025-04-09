@@ -57,9 +57,9 @@ class ApiStack(Stack):
                     ),
                 },
             ),
-            desired_count=2,
-            memory_limit_mib=2048,
-            cpu=1024,
+            desired_count=1,
+            memory_limit_mib=32768,
+            cpu=8192,
             # Listener port for NLB
             listener_port=80
         )
