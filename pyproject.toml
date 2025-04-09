@@ -64,7 +64,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [project.scripts]
-agent-api = "app.app:run_app"
+agent-api = "app.main:app"
+
+[tool.poetry.packages]
+include = "app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
