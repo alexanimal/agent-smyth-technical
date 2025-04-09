@@ -6,7 +6,7 @@ This endpoint should take a message from a user and will forward it to a RAG Age
 
 Load the OpenAI Key using dotenv
 
-The data that needs to be read into the Knowledge Base is in the __mocks__ folder in JSON format. 
+The data that needs to be read into the Knowledge Base is in the data folder in JSON format. 
 
 Use langchain and JSONLoader and jq to process the large json files. Batch where necessary.
 

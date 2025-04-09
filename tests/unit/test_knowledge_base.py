@@ -115,7 +115,7 @@ def test_project_root_exists():
 def test_mocks_dir_name():
     """Test that the mocks directory has the correct name."""
     from app.kb import MOCKS_DIR
-    assert MOCKS_DIR.endswith("__mocks__"), f"MOCKS_DIR '{MOCKS_DIR}' doesn't end with '__mocks__'"
+    assert MOCKS_DIR.endswith("data"), f"MOCKS_DIR '{MOCKS_DIR}' doesn't end with 'data'"
 
 #################################################
 # KnowledgeBaseManager Initialization Tests
@@ -126,7 +126,7 @@ def test_default_mocks_dir():
     from app.kb import MOCKS_DIR
     kb = KnowledgeBaseManager()
     assert kb.mocks_dir, "mocks_dir should not be empty"
-    assert "__mocks__" in kb.mocks_dir, "mocks_dir should point to __mocks__ directory"
+    assert "data" in kb.mocks_dir, "mocks_dir should point to data directory"
 
 def test_custom_mocks_dir():
     """Test that a custom mocks_dir is respected."""

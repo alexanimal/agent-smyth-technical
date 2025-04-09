@@ -18,7 +18,7 @@ class Environment:
         name = os.environ.get("ENV_NAME", "dev")
         return cls(
             name=name,
-            account=os.environ.get("CDK_DEFAULT_ACCOUNT", ""),
+            account=os.environ.get("CDK_DEFAULT_ACCOUNT", "998403024947"),
             region=os.environ.get("CDK_DEFAULT_REGION", "us-east-1"),
             is_production=name.lower() == "prod"
         )

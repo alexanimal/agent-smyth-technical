@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
     model_name: str = Field("gpt-4o-mini", alias="MODEL_NAME")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
-    mocks_dir_name: str = Field("__mocks__", alias="MOCKS_DIR_NAME")
+    mocks_dir_name: str = Field("data", alias="MOCKS_DIR_NAME")
 
     class Config:
         env_file = '.env'

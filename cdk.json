@@ -3,7 +3,8 @@
   "watch": {
     "include": [
       "infrastructure/**/*.py",
-      "app/**/*.py"
+      "app/**/*.py",
+      "tests/**/*.py"
     ],
     "exclude": [
       "README.md",

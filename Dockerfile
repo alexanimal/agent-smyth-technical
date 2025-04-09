@@ -21,7 +21,7 @@ COPY pyproject.toml README.md ./
 
 # Copy source code
 COPY app/ ./app/
-COPY __mocks__/ ./__mocks__/
+COPY data/ ./data/
 COPY .env ./
 
 # Create directory for the FAISS index

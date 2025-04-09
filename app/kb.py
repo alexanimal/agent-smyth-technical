@@ -33,24 +33,24 @@ def get_project_root() -> Path:
     # Strategy 1: Try to find the root by looking for key project directories/files
     current_file = Path(os.path.abspath(__file__))
     # Walk up the directory tree until we find the project root
-    # (where src directory and __mocks__ directory are)
+    # (where src directory and data directory are)
     potential_root = current_file.parent.parent
-    if (potential_root / "__mocks__").exists():
+    if (potential_root / "data").exists():
         return potential_root
     
     # Strategy 2: Use the current working directory if it seems to be the project root
     cwd = Path.cwd()
-    if (cwd / "__mocks__").exists() or (cwd / "src").exists():
+    if (cwd / "data").exists() or (cwd / "src").exists():
         return cwd
     
     # Strategy 3: Go up one level from CWD if that seems to be the project root
-    if (cwd.parent / "__mocks__").exists() or (cwd.parent / "src").exists():
+    if (cwd.parent / "data").exists() or (cwd.parent / "src").exists():
         return cwd.parent
         
     # Strategy 4: Look at sys.path for potential project root
     for path in sys.path:
         path = Path(path)
-        if (path / "__mocks__").exists() or (path / "src").exists():
+        if (path / "data").exists() or (path / "src").exists():
             return path
             
     # Final fallback: default to two directories up from this file
@@ -58,7 +58,7 @@ def get_project_root() -> Path:
 
 # Use the robust method to determine the directory containing the JSON data
 PROJECT_ROOT = get_project_root()
-MOCKS_DIR = str(Path.cwd() / "__mocks__")
+MOCKS_DIR = str(Path.cwd() / "data")
 print(f"Project root: {PROJECT_ROOT}")
 print(f"Mocks directory: {MOCKS_DIR}")
 

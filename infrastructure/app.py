@@ -2,7 +2,7 @@
 import os
 from aws_cdk import App, Environment as CdkEnvironment
 from infrastructure.stacks.api_stack import ApiStack
-from config import Environment
+from infrastructure.config import Environment
 
 app = App()
 

@@ -10,7 +10,7 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
 *   **FastAPI Backend:** Asynchronous web framework for high performance.
 *   **LangChain Integration:** Leverages LangChain for document loading, splitting, embedding, vector storage (FAISS), and QA chains.
 *   **OpenAI Embeddings & Models:** Uses OpenAI for generating embeddings and processing chat queries.
-*   **Tweet Data Source:** Builds knowledge base from JSON files containing tweet data (expected in `__mocks__` directory).
+*   **Tweet Data Source:** Builds knowledge base from JSON files containing tweet data (expected in `data` directory).
 *   **Background KB Loading:** Initializes the knowledge base in the background upon startup to avoid blocking API availability.
 *   **Persistent Index:** Saves and loads the FAISS vector store index and processed documents to/from disk (`faiss_index` directory) to avoid costly regeneration on restarts.
 *   **Automatic API Documentation:** Provides interactive Swagger UI (`/docs`) and ReDoc (`/redoc`) documentation generated automatically from FastAPI and Pydantic models.
@@ -58,7 +58,7 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
     ENVIRONMENT="development" # Set to "production" for deployment
     ```
 4.  **Prepare Tweet Data:**
-    *   Ensure you have your tweet data (in JSON format, with each file containing a list of tweet objects) placed inside a directory named `__mocks__` in the project root. The `kb.py` script will load data from here.
+    *   Ensure you have your tweet data (in JSON format, with each file containing a list of tweet objects) placed inside a directory named `data` in the project root. The `kb.py` script will load data from here.
 
 ## Running the Application (Development)
 
@@ -79,7 +79,7 @@ The API will be available at `http://localhost:8002`.
 *   **Alternative Docs (ReDoc):** `http://localhost:8002/redoc`
 
 The first time you run the application, it will:
-1.  Attempt to load JSON files from the `__mocks__` directory.
+1.  Attempt to load JSON files from the `data` directory.
 2.  Process the documents, generate embeddings (this might take time and cost OpenAI credits).
 3.  Create a FAISS index and save it along with processed documents to the `./faiss_index/` directory.
 Subsequent runs will load the index directly from `./faiss_index/`, skipping the embedding step, provided the index files are found and valid.
@@ -156,7 +156,7 @@ This is the standard way to package web applications for deployment.
     # Copy the application code into the container
     COPY ./app /app/app
     # Copy mocks and potentially the pre-built index if desired
-    # COPY ./__mocks__ /app/__mocks__
+    # COPY ./data /app/data
     # COPY ./faiss_index /app/faiss_index
 
     # Make port 8002 available to the world outside this container
@@ -186,7 +186,7 @@ This is the standard way to package web applications for deployment.
       -e API_KEY="your_secure_api_key_for_production" \
       -e ENVIRONMENT="production" \
       --mount type=bind,source="$(pwd)"/faiss_index,target=/app/faiss_index \
-      --mount type=bind,source="$(pwd)"/__mocks__,target=/app/__mocks__ \
+      --mount type=bind,source="$(pwd)"/data,target=/app/data \
       tweet-rag-api
     ```
     *   `-d`: Run in detached mode.

@@ -29,15 +29,15 @@ class TestPathResolution(unittest.TestCase):
     
     def test_mocks_dir_name(self):
         """Test that the mocks directory has the correct name."""
-        self.assertTrue(MOCKS_DIR.endswith("__mocks__"), 
-                       f"MOCKS_DIR '{MOCKS_DIR}' doesn't end with '__mocks__'")
+        self.assertTrue(MOCKS_DIR.endswith("data"), 
+                       f"MOCKS_DIR '{MOCKS_DIR}' doesn't end with 'data'")
     
     def test_strategy1_project_root(self):
         """Test Strategy 1: Finding the root by key project directories."""
-        # Create a mock implementation of exists that knows about __mocks__
+        # Create a mock implementation of exists that knows about data
         def mock_exists(self):
-            # This will be called on a Path object like: (potential_root / "__mocks__")
-            return "__mocks__" in str(self)
+            # This will be called on a Path object like: (potential_root / "data")
+            return "data" in str(self)
         
         # Patch the exists method on the Path class
         with patch('pathlib.Path.exists', mock_exists), \
@@ -58,10 +58,10 @@ class TestPathResolution(unittest.TestCase):
         def mock_exists(self):
             path_str = str(self)
             # Make strategy 1 fail
-            if '/fake/path/__mocks__' in path_str:
+            if '/fake/path/data' in path_str:
                 return False
             # But make strategy 2 succeed
-            if '/current/work/dir/__mocks__' in path_str or '/current/work/dir/app' in path_str:
+            if '/current/work/dir/data' in path_str or '/current/work/dir/app' in path_str:
                 return True
             # For any other paths, use the original exists method
             return original_exists(self)
@@ -86,12 +86,12 @@ class TestPathResolution(unittest.TestCase):
         def mock_exists(self):
             path_str = str(self)
             # Make strategies 1 and 2 fail
-            if '/some/other/path/__mocks__' in path_str or '/unrelated/dir/__mocks__' in path_str:
+            if '/some/other/path/data' in path_str or '/unrelated/dir/data' in path_str:
                 return False
             if '/unrelated/dir/app' in path_str:
                 return False
             # But make strategy 3 succeed
-            if '/parent/dir/__mocks__' in path_str or '/parent/dir/app' in path_str:
+            if '/parent/dir/data' in path_str or '/parent/dir/app' in path_str:
                 return True
             # For any other paths, use the original exists method
             return original_exists(self)
@@ -116,12 +116,12 @@ class TestPathResolution(unittest.TestCase):
         def mock_exists(self):
             path_str = str(self)
             # Make strategies 1, 2, and 3 fail
-            if any(x in path_str for x in ['/some/other/path/__mocks__', '/unrelated/dir/__mocks__']):
+            if any(x in path_str for x in ['/some/other/path/data', '/unrelated/dir/data']):
                 return False
-            if any(x in path_str for x in ['/unrelated/dir/app', '/unrelated/dir/parent/__mocks__']):
+            if any(x in path_str for x in ['/unrelated/dir/app', '/unrelated/dir/parent/data']):
                 return False
             # But make strategy 4 succeed for the second path in sys.path
-            if '/python/lib/site-packages/__mocks__' in path_str or '/python/lib/site-packages/app' in path_str:
+            if '/python/lib/site-packages/data' in path_str or '/python/lib/site-packages/app' in path_str:
                 return True
             # For any other paths, use the original exists method
             return original_exists(self)
