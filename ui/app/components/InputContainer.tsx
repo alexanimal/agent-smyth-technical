@@ -28,7 +28,7 @@ export default function InputContainer() {
                 'Content-Type': 'application/json',
                 'X-API-Key': '1234567890'
             },
-            body: JSON.stringify({ message, "num_results": 500 })
+            body: JSON.stringify({ message, "num_results": 25 })
         })
         const respJson = await resp.json();
         console.log(respJson);
