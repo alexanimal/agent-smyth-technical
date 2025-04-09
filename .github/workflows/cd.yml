@@ -8,7 +8,7 @@ on:
       - 'app/**'
       - 'tests/**'
       - 'cdk.json'
-      - '.github/workflows/deploy-infra.yml'
+      - '.github/workflows/cd.yml'
   pull_request:
     branches: [ main ]
     paths:
@@ -16,7 +16,7 @@ on:
       - 'app/**'
       - 'tests/**'
       - 'cdk.json'
-      - '.github/workflows/deploy-infra.yml'
+      - '.github/workflows/cd.yml'
 
 jobs:
   deploy:
