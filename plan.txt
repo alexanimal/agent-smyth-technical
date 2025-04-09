@@ -16,4 +16,8 @@ Create and Agent associated with our Knowledge Base Documents and query the know
 - CD (UI App and Coverage)
 - CI (hook up CodeCov)
 - Add more Github Actions
-- 
+- Time based querying? place more emphasis on newer tweets
+- refine trading thesis chain to be more effective
+- handling model selection in the API
+- unit testing
+- React App deployment and infrastructure
