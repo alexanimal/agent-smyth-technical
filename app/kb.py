@@ -13,6 +13,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
+from dateutil import parser
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import JSONLoader
@@ -62,13 +63,24 @@ class KnowledgeBaseManager:
 
     @staticmethod
     def metadata_extractor(record: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract metadata from a tweet record."""
+        """Extract metadata from a tweet record, including a Unix timestamp."""
+        created_at_str = record.get("createdAt", "")
+        timestamp_unix: Optional[float] = None
+        if created_at_str:
+            try:
+                parsed_time = parser.parse(created_at_str)
+                timestamp_unix = parsed_time.timestamp()
+            except (ValueError, TypeError) as e:
+                # Log a warning if parsing fails
+                logger.warning(f"Could not parse timestamp '{created_at_str}': {e}")
+
         return {
             "id": record.get("id", ""),
-            "created_at": record.get("createdAt", ""),
+            "created_at": created_at_str,  # Keep original string if needed
+            "timestamp_unix": timestamp_unix,  # Add the Unix timestamp (float or None)
             "url": record.get("url", ""),
             "profile": record.get("profile", ""),
-            "tweet_time": record.get("tweet_time", ""),
+            "tweet_time": record.get("tweet_time", ""),  # Assuming this is different
         }
 
     @staticmethod
@@ -354,9 +366,21 @@ def metadata_extractor(record: Dict[str, Any], metadata: Dict[str, Any]) -> Dict
     Returns:
         A dictionary of metadata
     """
+    # Also update the standalone function for consistency
+    created_at_str = record.get("createdAt", "")
+    timestamp_unix: Optional[float] = None
+    if created_at_str:
+        try:
+            parsed_time = parser.parse(created_at_str)
+            timestamp_unix = parsed_time.timestamp()
+        except (ValueError, TypeError) as e:
+            # Log a warning if parsing fails
+            logger.warning(f"Could not parse timestamp '{created_at_str}': {e}")
+
     return {
         "id": record.get("id", ""),
-        "created_at": record.get("createdAt", ""),
+        "created_at": created_at_str,  # Keep original string if needed
+        "timestamp_unix": timestamp_unix,  # Add the Unix timestamp (float or None)
         "url": record.get("url", ""),
         "profile": record.get("profile", ""),
         "tweet_time": record.get("tweet_time", ""),

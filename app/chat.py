@@ -5,13 +5,14 @@ Module for handling chat interactions using RAG capabilities with conditional or
 import asyncio
 import logging
 import time
+from operator import itemgetter
 from typing import Any, Dict, List, Optional, Set
 
-from langchain.chains import RetrievalQA
 from langchain_core.documents import Document
 from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
 from langchain_core.vectorstores import VectorStore
 from langchain_openai import ChatOpenAI
 
@@ -109,25 +110,6 @@ class ChatHandler:
         """Get a prompt template for transforming PM notes into comprehensive trading theses."""
         return PromptManager.get_trading_thesis_prompt()
 
-    def _create_qa_chain(self, prompt_template: ChatPromptTemplate, k: int = 5) -> RetrievalQA:
-        """
-        Create a retrieval QA chain with the specified prompt template.
-
-        Args:
-            prompt_template: The prompt template to use
-            k: Number of documents to retrieve
-
-        Returns:
-            A configured RetrievalQA chain
-        """
-        return RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",
-            retriever=self.knowledge_base.as_retriever(search_kwargs={"k": k}),
-            return_source_documents=True,
-            chain_type_kwargs={"prompt": prompt_template},
-        )
-
     def _extract_sources(self, documents: List[Document]) -> List[str]:
         """Extract source URLs from documents."""
         sources: Set[str] = set()
@@ -140,49 +122,107 @@ class ChatHandler:
 
     async def process_query(self, message: str, k: int = 5) -> Dict[str, Any]:
         """
-        Process a user query with dynamic orchestration.
+        Process a user query with dynamic orchestration and re-ranking by recency.
 
         Args:
             message: The user's query message
-            k: Number of documents to retrieve
+            k: The final number of documents to use after re-ranking
 
         Returns:
             Dict containing response and sources
         """
         retries = 0
         last_error = None
+        oversample_factor = 2  # Fetch more documents initially for better re-ranking
 
         while retries <= self.max_retries:
             try:
                 start_time = time.time()
 
-                # Classify the query
+                # 1. Classify the query
                 query_type = await self.router.classify_query(message)
 
-                # Choose the appropriate prompt based on classification
+                # Adjust k if needed for specific query types
+                final_k = k
+                if query_type == "trading_thesis":
+                    final_k = max(k, 10)  # Fetch more for trading thesis
+
+                # 2. Initial Retrieval (Oversampled)
+                initial_k = final_k * oversample_factor
+                logger.debug(f"Retrieving initial {initial_k} documents for query: {message}")
+                retriever = self.knowledge_base.as_retriever(search_kwargs={"k": initial_k})
+                # Use retriever directly instead of RetrievalQA chain
+                initial_docs = await retriever.ainvoke(message)
+                logger.debug(f"Retrieved {len(initial_docs)} initial documents.")
+
+                # 3. Re-ranking by Timestamp (Recency)
+                # Assuming 'timestamp_unix' (float/int) exists in metadata
+                valid_docs_with_ts = []
+                for doc in initial_docs:
+                    timestamp = doc.metadata.get("timestamp_unix")
+                    if timestamp is not None:
+                        try:
+                            # Ensure it's a comparable number (float/int)
+                            valid_docs_with_ts.append((doc, float(timestamp)))
+                        except (ValueError, TypeError):
+                            logger.warning(
+                                f"Document metadata has invalid timestamp_unix: {timestamp}. Skipping for sorting."
+                            )
+                    else:
+                        logger.warning(
+                            "Document missing 'timestamp_unix' metadata. Skipping for sorting."
+                        )
+
+                # Sort by timestamp descending (newest first)
+                valid_docs_with_ts.sort(key=itemgetter(1), reverse=True)
+
+                # Select top k documents after sorting
+                re_ranked_docs = [doc for doc, ts in valid_docs_with_ts[:final_k]]
+                logger.debug(f"Selected {len(re_ranked_docs)} documents after re-ranking.")
+
+                if not re_ranked_docs:
+                    logger.warning("No valid documents found after re-ranking. Cannot proceed.")
+                    # Handle case with no docs: return empty response or raise error
+                    return {
+                        "response": "I couldn't find any relevant information.",
+                        "sources": [],
+                        "processing_time": time.time() - start_time,
+                        "query_type": query_type,
+                    }
+
+                # 4. Construct Context String
+                context_string = "\\n\\n---\\n\\n".join(
+                    [doc.page_content for doc in re_ranked_docs]
+                )
+
+                # 5. Choose Prompt
                 if query_type == "investment":
                     prompt_template = self._get_investment_prompt()
                 elif query_type == "trading_thesis":
                     prompt_template = self._get_trading_thesis_prompt()
-                    # For trading thesis, we want more relevant documents
-                    k = max(k, 10)
-                else:
+                else:  # general
                     prompt_template = self._get_general_prompt()
 
-                # Create QA chain with the selected prompt
-                qa_chain = self._create_qa_chain(prompt_template, k)
+                # 6. Define and Invoke LLM Chain using LCEL
+                # Setup runnable to format inputs for the prompt
+                inputs = RunnableParallel(
+                    context=RunnableLambda(lambda x: context_string),  # Pass re-ranked context
+                    question=RunnablePassthrough(),  # Pass original question
+                )
+                # Chain: Prepare inputs -> Format prompt -> Call LLM -> Parse output
+                chain = inputs | prompt_template | self.llm | StrOutputParser()
 
-                # Invoke the chain
-                result = qa_chain.invoke(message)
+                logger.debug(f"Invoking LLM chain for query type: {query_type}")
+                response = await chain.ainvoke(message)
 
-                # Extract sources
-                sources = self._extract_sources(result.get("source_documents", []))
+                # 7. Extract sources from the re-ranked documents used
+                sources = self._extract_sources(re_ranked_docs)
 
                 process_time = time.time() - start_time
                 logger.info(f"Query processed in {process_time:.2f} seconds (type: {query_type})")
 
                 return {
-                    "response": result["result"],
+                    "response": response,
                     "sources": sources,
                     "processing_time": process_time,
                     "query_type": query_type,
@@ -192,7 +232,8 @@ class ChatHandler:
                 retries += 1
                 last_error = e
                 logger.warning(
-                    f"Error in chat processing (attempt {retries}/{self.max_retries}): {str(e)}"
+                    f"Error in chat processing (attempt {retries}/{self.max_retries}): {str(e)}",
+                    exc_info=True,  # Log stack trace for debugging
                 )
 
                 if retries <= self.max_retries:

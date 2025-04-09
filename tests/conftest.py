@@ -13,6 +13,13 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 
+# Register pytest markers
+def pytest_configure(config):
+    """Register custom markers for categorizing tests."""
+    config.addinivalue_line("markers", "basic: mark a test as a basic test")
+    config.addinivalue_line("markers", "advanced: mark a test as an advanced test")
+
+
 @pytest.fixture(scope="function", autouse=True)
 def mock_env_vars(monkeypatch):
     """Automatically mock required environment variables for the test session."""
