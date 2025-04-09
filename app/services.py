@@ -1,3 +1,17 @@
+"""
+Service management module for the RAG Agent application.
+
+This module provides service initialization, dependency injection, and
+state management for the application. It handles:
+- Loading and initialization of the knowledge base
+- Management of the chat handler instance
+- Application state tracking and access
+- Service availability checking for API endpoints
+
+The module maintains a global application state and provides dependency
+functions that can be used with FastAPI to manage access to services.
+"""
+
 import asyncio
 import glob
 import logging
@@ -26,7 +40,21 @@ kb_manager = KnowledgeBaseManager(mocks_dir=MOCKS_DIR_PATH)
 
 
 async def initialize_services():
-    """Load knowledge base and initialize chat handler in background."""
+    """
+    Load knowledge base and initialize chat handler in background.
+
+    This asynchronous function initializes core application services,
+    including loading or creating the knowledge base and setting up
+    the chat handler. It sets global state flags during initialization
+    and handles errors appropriately.
+
+    Returns:
+        None
+
+    Raises:
+        No exceptions are raised to the caller, but exceptions during
+        initialization are logged and the service state is updated accordingly.
+    """
     global app_state  # Modify global state dictionary
     if app_state["is_kb_loading"] or app_state["knowledge_base"]:
         logger.info("Initialization already in progress or completed.")
@@ -64,7 +92,19 @@ async def initialize_services():
 
 # Dependency function to get the handler
 async def get_current_chat_handler() -> ChatHandler:
-    """Dependency to get the chat handler, raising 503 if not ready."""
+    """
+    Dependency to get the chat handler, raising 503 if not ready.
+
+    This function is used as a FastAPI dependency to provide the chat handler
+    to endpoint handlers. It checks if the handler is available and ready for use,
+    raising appropriate HTTP exceptions if not.
+
+    Returns:
+        ChatHandler: The initialized chat handler instance
+
+    Raises:
+        HTTPException(503): If the knowledge base is initializing or failed to initialize
+    """
     if not app_state["chat_handler"]:
         status_code = 503  # Service Unavailable
         detail = "Knowledge base is initializing. Please try again shortly."
@@ -79,5 +119,14 @@ async def get_current_chat_handler() -> ChatHandler:
 
 # Dependency function to get the app state (for status endpoints)
 def get_app_state() -> dict:
-    """Dependency to get the current application state."""
+    """
+    Dependency to get the current application state.
+
+    This function is used as a FastAPI dependency to provide access to
+    the application state dictionary, which contains information about
+    the current state of core services.
+
+    Returns:
+        dict: The application state dictionary containing service status information
+    """
     return app_state
