@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import os
-from aws_cdk import App, Environment as CdkEnvironment
+
+from aws_cdk import App
+from aws_cdk import Environment as CdkEnvironment
+
+from infrastructure.config import Environment
 from infrastructure.stacks.api_stack import ApiStack
-from config import Environment
 
 app = App()
 
@@ -10,10 +13,7 @@ app = App()
 env_config = Environment.from_context()
 
 # Define AWS environment
-aws_env = CdkEnvironment(
-    account=env_config.account,
-    region=env_config.region
-)
+aws_env = CdkEnvironment(account=env_config.account, region=env_config.region)
 
 # Create stacks with naming convention based on environment
 base_id = "AgentSmyth"

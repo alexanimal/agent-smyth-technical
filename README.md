@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project provides a FastAPI-based API for a Retrieval-Augmented Generation (RAG) agent. The agent uses LangChain and OpenAI's models to answer user queries based on a knowledge base built from tweet data (expected in JSON format). It features automatic query classification, source attribution, background knowledge base loading, and detailed API documentation.
+This project provides a FastAPI-based API for a Retrieval-Augmented Generation (RAG) agent. The agent uses LangChain and OpenAI's models to answer user queries based on a knowledge base built from tweet data (expected in JSON format). It features automatic query classification, source attribution, background knowledge base loading with persistence, automated code quality checks, CI/CD pipelines, and detailed API documentation.
 
 ## Key Features
 
@@ -10,20 +10,26 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
 *   **FastAPI Backend:** Asynchronous web framework for high performance.
 *   **LangChain Integration:** Leverages LangChain for document loading, splitting, embedding, vector storage (FAISS), and QA chains.
 *   **OpenAI Embeddings & Models:** Uses OpenAI for generating embeddings and processing chat queries.
-*   **Tweet Data Source:** Builds knowledge base from JSON files containing tweet data (expected in `__mocks__` directory).
-*   **Background KB Loading:** Initializes the knowledge base in the background upon startup to avoid blocking API availability.
-*   **Persistent Index:** Saves and loads the FAISS vector store index and processed documents to/from disk (`faiss_index` directory) to avoid costly regeneration on restarts.
-*   **Automatic API Documentation:** Provides interactive Swagger UI (`/docs`) and ReDoc (`/redoc`) documentation generated automatically from FastAPI and Pydantic models.
-*   **Enhanced API Models:** Uses detailed Pydantic models for requests and responses, including examples, descriptions, and validation.
-*   **Custom Headers:** Includes informative headers like `X-Request-ID`, `X-Processing-Time`, etc.
-*   **Logging & Middleware:** Implements request logging via middleware.
+*   **Tweet Data Source:** Builds knowledge base from JSON files containing tweet data (expected in `data` directory).
+*   **Robust Knowledge Base Management:**
+    *   Initializes the KB in the background upon startup.
+    *   Uses parallel processing for faster document loading.
+    *   Persists the FAISS vector store index and processed documents to disk (`faiss_index` directory) using pickle for efficient restarts.
+    *   Includes integrity checks for the saved index.
+*   **Poetry Dependency Management:** Uses Poetry for clear dependency declaration and environment management (`pyproject.toml`, `poetry.lock`).
+*   **Automated Code Quality:** Integrates `pre-commit` hooks with `black` and `isort` for consistent code formatting and import sorting before commits.
+*   **CI/CD Pipelines:** Includes GitHub Actions workflows (`ci.yaml`, `cd.yml`) for automated testing on push/pull requests and deployment on merges to main.
+*   **Automatic API Documentation:** Provides interactive Swagger UI (`/docs`) and ReDoc (`/redoc`).
+*   **Enhanced API Models:** Uses detailed Pydantic models for requests and responses.
+*   **Custom Headers & Middleware:** Includes informative headers and request logging.
 
 ## Prerequisites
 
-*   Python 3.10+
-*   `pip` (Python package installer)
+*   Python >=3.10.12, <4.0 (as defined in `pyproject.toml`)
+*   Poetry (Python packaging and dependency management tool)
 *   Git
 *   An OpenAI API Key
+*   (Optional) AWS Credentials and CDK for deployment (`cd.yml`).
 
 ## Setup and Installation
 
@@ -33,17 +39,24 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
     cd <repository-directory>
     ```
 
-2.  **Create a Virtual Environment:**
+2.  **Install Dependencies using Poetry:**
+    This command reads the `pyproject.toml` file, resolves dependencies, installs them into a virtual environment managed by Poetry, and installs development dependencies (`pytest`, `black`, `isort`, `pre-commit`, etc.).
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    poetry install --with dev
     ```
 
-3.  **Install Dependencies:**
+3.  **Activate the Virtual Environment (Optional but Recommended):**
+    To work directly within the environment Poetry created:
     ```bash
-    pip install -r requirements.txt
+    poetry shell
     ```
-    *(Note: If you don't have a `requirements.txt`, create one using `pip freeze > requirements.txt` after installing necessary packages like `fastapi`, `uvicorn`, `langchain`, `langchain-openai`, `faiss-cpu` or `faiss-gpu`, `pydantic`, `python-dotenv`, `pytest`, etc.)*
+    Alternatively, prefix commands with `poetry run`.
+
+4.  **Install Pre-commit Hooks:**
+    This sets up the git hooks defined in `.pre-commit-config.yaml`. They will run automatically before each commit.
+    ```bash
+    poetry run pre-commit install
+    ```
 
 ## Configuration
 
@@ -52,37 +65,50 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
     ```dotenv
     OPENAI_API_KEY="your_openai_api_key_here"
     ```
-3.  **(Optional) Add Production API Key:** If you plan to use API key authentication in production (as hinted in `main.py`), add:
+3.  **(Optional) Add Production API Key & Environment:**
     ```dotenv
     API_KEY="your_secure_api_key_for_production"
     ENVIRONMENT="development" # Set to "production" for deployment
     ```
 4.  **Prepare Tweet Data:**
-    *   Ensure you have your tweet data (in JSON format, with each file containing a list of tweet objects) placed inside a directory named `__mocks__` in the project root. The `kb.py` script will load data from here.
+    *   Ensure you have your tweet data (in JSON format, with each file containing a list of tweet objects) placed inside a directory named `data` in the project root. The `app/kb.py` script will load data from here.
 
 ## Running the Application (Development)
 
-To run the FastAPI application locally for development:
+To run the FastAPI application locally for development (ensure you have activated the Poetry shell or use `poetry run`):
 
 ```bash
-uvicorn src.main:app --host localhost --port 8002 --reload
+poetry run uvicorn app.main:app --host localhost --port 8003 --reload
 ```
 
-*   `src.main:app`: Points to the FastAPI `app` instance in `src/main.py`.
+*   `app.main:app`: Points to the FastAPI `app` instance in `app/main.py`.
 *   `--host localhost`: Makes the server available only on your local machine.
-*   `--port 8002`: Specifies the port to run on.
+*   `--port 8003`: Specifies the port to run on (adjust if needed, check `app/main.py`).
 *   `--reload`: Enables auto-reloading when code changes are detected.
 
-The API will be available at `http://localhost:8002`.
+The API will be available at `http://localhost:8003`.
 
-*   **Interactive Docs (Swagger):** `http://localhost:8002/docs`
-*   **Alternative Docs (ReDoc):** `http://localhost:8002/redoc`
+*   **Interactive Docs (Swagger):** `http://localhost:8003/docs`
+*   **Alternative Docs (ReDoc):** `http://localhost:8003/redoc`
 
 The first time you run the application, it will:
-1.  Attempt to load JSON files from the `__mocks__` directory.
+1.  Attempt to load JSON files from the `data` directory using parallel processing.
 2.  Process the documents, generate embeddings (this might take time and cost OpenAI credits).
 3.  Create a FAISS index and save it along with processed documents to the `./faiss_index/` directory.
 Subsequent runs will load the index directly from `./faiss_index/`, skipping the embedding step, provided the index files are found and valid.
+
+## Development Workflow
+
+*   **Code Formatting & Imports:** Before committing changes, `pre-commit` hooks will automatically run `black` to format your code and `isort` to sort imports according to the configurations in `pyproject.toml`. If files are modified by the hooks, you'll need to `git add` them again before committing.
+*   **Manual Checks:** You can manually run the pre-commit checks on all files:
+    ```bash
+    poetry run pre-commit run --all-files
+    ```
+*   **Adding Dependencies:** Use Poetry to add new dependencies:
+    ```bash
+    poetry add <package_name>
+    poetry add --group dev <dev_package_name> # For development dependencies
+    ```
 
 ## API Usage
 
@@ -92,10 +118,10 @@ The primary endpoint is `/chat`.
 
 ```bash
 curl -X 'POST' \
-  'http://localhost:8002/chat' \
+  'http://localhost:8003/chat' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'X-API-Key: your_secure_api_key_for_production' \
+  -H 'X-API-Key: your_secure_api_key_for_production' \ # Only needed if API Key Auth is enabled
   -d '{
   "message": "What are the latest developments for AAPL?",
   "num_results": 5,
@@ -103,166 +129,115 @@ curl -X 'POST' \
 }'
 ```
 
-Refer to the `/docs` endpoint for detailed information on all endpoints (`/`, `/health`, `/chat`, `/chat/analyze`), request/response models, and headers.
+Refer to the `/docs` endpoint for detailed information on all endpoints (`/`, `/health`, `/chat`), request/response models, and headers.
 
 ## Testing
 
-To run the test suite:
+To run the test suite (using `pytest`):
 
 ```bash
-# Ensure your project root is in the python path for imports to work
-export PYTHONPATH=$(pwd):$PYTHONPATH # Linux/macOS
-# set PYTHONPATH=%cd%;%PYTHONPATH% # Windows CMD
-# $env:PYTHONPATH = "$pwd;$env:PYTHONPATH" # Windows PowerShell
-
-# Run tests
-pytest tests/
+# Ensure you are in the poetry shell or prefix with poetry run
+poetry run pytest tests/
 
 # Run tests with coverage report
-pytest --cov=src tests/
+poetry run pytest --cov=app tests/
 ```
+Poetry automatically manages the `PYTHONPATH`, so manual exporting is not needed.
+
+## CI/CD
+
+This project uses GitHub Actions for Continuous Integration and Continuous Deployment:
+
+*   **CI (`.github/workflows/ci.yaml`):**
+    *   Triggered on push/pull requests to `main` affecting relevant paths.
+    *   Checks out code, sets up Python and Poetry.
+    *   Installs dependencies (`poetry install --with dev`).
+    *   Runs linters (`black --check`, `isort --check`), type checking (`mypy`), and unit tests (`pytest`).
+    *   Uploads coverage reports to Codecov.
+*   **CD (`.github/workflows/cd.yml`):**
+    *   Triggered on successful completion of the CI workflow on the `main` branch.
+    *   Checks out the specific commit that passed CI.
+    *   Sets up Python, Poetry, Node.js (for CDK), and AWS credentials.
+    *   Installs main and infrastructure dependencies (`poetry install --only main,infra`).
+    *   Deploys the infrastructure using AWS CDK (`poetry run cdk deploy`). Requires AWS secrets configured in GitHub repository settings.
 
 ## Building and Packaging
 
-There are two main ways to package this application:
-
 **1. Using Docker (Recommended for Web Services/Deployment)**
 
-This is the standard way to package web applications for deployment.
-
-*   **Create a `Dockerfile`:** Add a file named `Dockerfile` (no extension) to your project root. Here's a common example for FastAPI:
+*   **Create/Update a `Dockerfile`:** Ensure your Dockerfile uses Poetry for installing dependencies. Example snippet:
 
     ```dockerfile
     # Use an official Python runtime as a parent image
     FROM python:3.10-slim
 
-    # Set the working directory in the container
     WORKDIR /app
 
-    # Prevent Python from writing pyc files to disc
     ENV PYTHONDONTWRITEBYTECODE 1
-    # Ensure Python output is sent straight to terminal without buffering
     ENV PYTHONUNBUFFERED 1
 
-    # Install system dependencies if needed (e.g., for FAISS or other libraries)
-    # RUN apt-get update && apt-get install -y --no-install-recommends some-package && rm -rf /var/lib/apt/lists/*
+    # Install Poetry
+    RUN pip install --upgrade pip poetry
 
-    # Install Poetry or just use pip
-    # RUN pip install --upgrade pip
-    # If using requirements.txt:
-    COPY requirements.txt .
-    RUN pip install --no-cache-dir -r requirements.txt
+    # Copy only files necessary for dependency installation
+    COPY pyproject.toml poetry.lock ./
+
+    # Install dependencies --no-root installs only dependencies, not the project itself
+    # --no-interaction prevents prompts, --no-ansi prevents color codes in logs
+    # Use --without dev to exclude development dependencies in production image
+    RUN poetry config virtualenvs.create false && poetry install --no-root --no-interaction --no-ansi --without dev
 
     # Copy the application code into the container
-    COPY ./src /app/src
-    # Copy mocks and potentially the pre-built index if desired
-    # COPY ./__mocks__ /app/__mocks__
+    COPY ./app /app/app
+    # Optionally copy data/index if not mounting volumes
+    # COPY ./data /app/data
     # COPY ./faiss_index /app/faiss_index
 
-    # Make port 8002 available to the world outside this container
-    EXPOSE 8002
+    EXPOSE 8003 # Match the port used by uvicorn
 
-    # Define environment variable defaults (can be overridden)
     ENV ENVIRONMENT=production
-    ENV PORT=8002
-    # Note: OPENAI_API_KEY should be passed securely at runtime, not hardcoded
+    ENV PORT=8003
+    # OPENAI_API_KEY should be passed securely at runtime
 
-    # Run uvicorn server when the container launches
-    # Use 0.0.0.0 to listen on all available interfaces inside the container
-    CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]
     ```
 
 *   **Build the Docker Image:**
     ```bash
     docker build -t tweet-rag-api .
     ```
-    (Replace `tweet-rag-api` with your desired image name).
 
 *   **Run the Docker Container:**
     ```bash
     docker run -d --name my-rag-app \
-      -p 8002:8002 \
+      -p 8003:8003 \ # Match exposed port
       -e OPENAI_API_KEY="your_openai_api_key_here" \
       -e API_KEY="your_secure_api_key_for_production" \
       -e ENVIRONMENT="production" \
+      # Mount volumes for persistent index/data if needed
       --mount type=bind,source="$(pwd)"/faiss_index,target=/app/faiss_index \
-      --mount type=bind,source="$(pwd)"/__mocks__,target=/app/__mocks__ \
+      --mount type=bind,source="$(pwd)"/data,target=/app/data \
       tweet-rag-api
     ```
-    *   `-d`: Run in detached mode.
-    *   `--name my-rag-app`: Assign a name to the container.
-    *   `-p 8002:8002`: Map port 8002 on your host to port 8002 in the container.
-    *   `-e`: Pass environment variables securely.
-    *   `--mount`: (Optional but recommended) Mount local directories for the index and mocks into the container. This allows the container to use the index you built locally or build it persistently outside the container's ephemeral filesystem. If you copied these into the image during the build, you might not need the mounts unless the data changes frequently.
 
-**2. Using Standard Python Packaging (Wheels/Sdist)**
+**2. Using Standard Python Packaging (Wheels/Sdist via Poetry)**
 
-This creates standard Python package files (`.whl`, `.tar.gz`) which can be installed using `pip`. This is less common for *deploying* a web service directly but useful for distributing libraries.
-
-*   **Install the build tool:**
-    ```bash
-    pip install build
-    ```
-*   **Ensure you have a `pyproject.toml`:** This file defines build system requirements and project metadata. You likely have one already if you use `pytest`. Ensure it has a `[project]` section with metadata like `name`, `version`, etc., and a `[build-system]` section. Example:
-
-    ```toml
-    [build-system]
-    requires = ["setuptools>=61.0"]
-    build-backend = "setuptools.build_meta"
-
-    [project]
-    name = "tweet_rag_api"
-    version = "1.0.0"
-    authors = [
-      { name="Your Name", email="your@email.com" },
-    ]
-    description = "A RAG agent API for tweets."
-    readme = "README.md"
-    requires-python = ">=3.10"
-    classifiers = [
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License", # Choose your license
-        "Operating System :: OS Independent",
-    ]
-    dependencies = [
-        # List all your dependencies from requirements.txt here
-        "fastapi>=0.100.0",
-        "uvicorn[standard]>=0.20.0",
-        "langchain>=0.1.0",
-        "langchain-openai>=0.1.0",
-        "faiss-cpu", # or faiss-gpu
-        "pydantic>=2.0.0",
-        "python-dotenv>=1.0.0",
-        # ... other dependencies
-    ]
-
-    [project.optional-dependencies]
-    dev = [
-        "pytest",
-        "pytest-cov",
-        # ... other dev dependencies
-    ]
-
-    [project.urls]
-    "Homepage" = "https://github.com/yourusername/yourproject" # Example
-    "Bug Tracker" = "https://github.com/yourusername/yourproject/issues" # Example
-    ```
+Poetry handles building standard Python packages.
 
 *   **Run the build command:**
     ```bash
-    python -m build
+    poetry build
     ```
-    This will create a `dist` directory containing a `.whl` (wheel) file and a `.tar.gz` (source distribution) file.
-
-*   **Usage:** While you *can* install this package (`pip install dist/tweet_rag_api-1.0.0-py3-none-any.whl`), you still need a separate process (like `uvicorn src.main:app ...`) to run the actual web server. This is why Docker is generally preferred for deploying web applications.
+    This will create wheel (`.whl`) and source distribution (`.tar.gz`) files in the `dist/` directory based on the configuration in `pyproject.toml`. These can be installed using `pip`, but running the web service still requires a separate process like `uvicorn`.
 
 ## Deployment Notes
 
-*   For production, use a production-grade ASGI server like Uvicorn managed by a process manager (e.g., Gunicorn with Uvicorn workers, Supervisor, systemd).
+*   For production, use a production-grade ASGI server like Uvicorn managed by a process manager (e.g., Gunicorn with Uvicorn workers, Supervisor, systemd). The Docker approach handles this.
 *   Set the `ENVIRONMENT` environment variable to `production`.
-*   Ensure proper API key management and security.
-*   Configure CORS (`allow_origins`) restrictively for your frontend domain(s).
-*   Consider placing the application behind a reverse proxy like Nginx or Traefik for handling SSL, load balancing, and serving static files if needed.
+*   Ensure proper API key management (pass via environment variables or secrets management).
+*   Configure CORS (`allow_origins` in `app/config.py`) restrictively.
+*   Consider a reverse proxy (Nginx, Traefik) for SSL, load balancing, etc.
+*   The included `cd.yml` workflow provides an example of deploying via AWS CDK.
 
 ## Contributing
 

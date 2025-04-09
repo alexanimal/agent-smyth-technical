@@ -3,14 +3,16 @@
   "watch": {
     "include": [
       "infrastructure/**/*.py",
-      "src/**/*.py"
+      "app/**/*.py",
+      "tests/**/*.py"
     ],
     "exclude": [
       "README.md",
       "cdk*.json",
       "requirements*.txt",
       "**/__pycache__",
-      "tests"
+      "tests",
+      "venv"
     ]
   },
   "context": {
