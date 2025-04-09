@@ -28,7 +28,7 @@ COPY .env ./
 RUN mkdir -p /app/faiss_index && chmod 777 /app/faiss_index
 
 # Install dependencies with UV
-RUN uv pip install .
+RUN pip install .
 
 # Create entry script
 RUN echo '#!/bin/bash\n\
