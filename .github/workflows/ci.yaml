@@ -61,6 +61,8 @@ jobs:
           poetry run mypy .
 
       - name: Run unit tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           poetry run pytest --cov=app --cov-report=xml # Run tests and generate coverage report
 
