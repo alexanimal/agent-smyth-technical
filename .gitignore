@@ -12,7 +12,6 @@ __pycache__
 .pytest_cache
 cdk.out/
 .coverage
-data/
 ui/node_modules/
 ui/.next/
 ui/dist/
