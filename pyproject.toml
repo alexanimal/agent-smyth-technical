@@ -68,7 +68,6 @@ warn_unused_ignores = true
 
 [project.scripts]
 agent-api = "app.app:run_app"
-run-test = "python -m pytest --cov=app tests/"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
