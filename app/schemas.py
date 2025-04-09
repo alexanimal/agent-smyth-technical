@@ -27,11 +27,13 @@ class QueryType(str, Enum):
         GENERAL: General knowledge query type for standard RAG responses
         INVESTMENT: Investment-specific query type for financial analysis
         TRADING: Trading-related query type for market strategy queries
+        TECHNICAL: Technical analysis query type for chart patterns and indicators
     """
 
     GENERAL = "general"
     INVESTMENT = "investment"
     TRADING = "trading"
+    TECHNICAL = "technical"
 
 
 class ChatRequest(BaseModel):

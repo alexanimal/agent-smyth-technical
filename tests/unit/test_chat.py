@@ -5,6 +5,7 @@ Unit tests for the chat module.
 import asyncio
 import time
 from operator import itemgetter
+from typing import List
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
@@ -358,7 +359,11 @@ class TestChatHandler:
 
     @pytest.mark.asyncio
     async def test_process_query_retry_on_error(self):
-        """Test retry logic when an error occurs during process_query execution."""
+        """Test retry logic when an error occurs during process_query execution.
+
+        This test verifies that when the LLM call fails, the process_query method
+        will retry the operation and eventually succeed if a subsequent attempt works.
+        """
         # Create mock documents
         mock_docs = [
             Document(
@@ -391,6 +396,9 @@ class TestChatHandler:
         class MockLLMWithRetry(BaseChatModel):
             invoke_count: int = Field(default=0)
 
+            # Track if an error was raised for debugging
+            error_raised: bool = Field(default=False)
+
             @property
             def _llm_type(self) -> str:
                 return "mock_chat_model"
@@ -405,9 +413,12 @@ class TestChatHandler:
                 self.invoke_count += 1
                 if self.invoke_count == 1:
                     # First call fails with connection error
+                    self.error_raised = True
+                    print("Simulating connection error in mock LLM")
                     raise ConnectionResetError("Connection reset by peer")
 
                 # Second call succeeds
+                print("Mock LLM succeeding on retry")
                 message = AIMessage(content=expected_response)
                 chat_generation = ChatGeneration(message=message)
                 return ChatResult(generations=[chat_generation])
@@ -423,16 +434,14 @@ class TestChatHandler:
         # Create handler with our mocks
         handler = ChatHandler(knowledge_base=mock_kb)
         handler._router = mock_router
+        # Directly replace the LLM with our mock
+        handler._llm = mock_llm
 
         # Create a prompt template that's compatible with the chain
         mock_prompt = PromptTemplate.from_template("{context}\n\nQuestion: {question}")
 
         # Replace the necessary components for testing
-        with (
-            patch.object(handler, "_get_general_prompt", return_value=mock_prompt),
-            patch.object(handler, "_llm", mock_llm),
-        ):
-
+        with patch.object(handler, "_get_general_prompt", return_value=mock_prompt):
             # Call the process_query method
             result = await handler.process_query(message)
 
@@ -443,6 +452,7 @@ class TestChatHandler:
 
             # Verify that the LLM was called twice (first failure, second success)
             assert mock_llm.invoke_count == 2
+            assert mock_llm.error_raised is True, "The error was not raised during the test"
 
     @pytest.mark.asyncio
     async def test_process_query_max_retries_exceeded(self):
@@ -481,6 +491,139 @@ class TestChatHandler:
 
         # Verify the number of attempts
         assert attempts == max_retries + 1  # Initial attempt + retries
+
+    def test_technical_llm_lazy_loading(self):
+        """Test that technical LLM is lazily loaded with lower temperature."""
+        # Arrange
+        mock_kb = MagicMock(spec=VectorStore)
+
+        # Act
+        with patch("app.chat.ChatOpenAI") as mock_chat_openai:
+            # Configure the mock return value
+            mock_llm_instance = MagicMock()
+            mock_chat_openai.return_value = mock_llm_instance
+
+            handler = ChatHandler(knowledge_base=mock_kb, model_name="test-model", temperature=0.5)
+
+            # Assert - Technical LLM should not be initialized yet
+            assert handler._technical_llm is None
+            mock_chat_openai.assert_not_called()
+
+            # Access the technical_llm property
+            llm = handler.technical_llm
+
+            # Assert - Technical LLM should now be initialized with lower temperature
+            assert handler._technical_llm is not None
+            # Verify the model name and reduced temperature were passed correctly
+            mock_chat_openai.assert_called_once_with(
+                model="test-model", temperature=0.3
+            )  # 0.5 - 0.2 = 0.3
+
+    @pytest.mark.asyncio
+    async def test_get_technical_analysis_prompt(self, chat_handler):
+        """Test getting the technical analysis prompt template."""
+        # Arrange
+        with patch.object(
+            PromptManager, "get_technical_analysis_prompt", return_value="technical_analysis_mock"
+        ) as mock_get_tech_analysis:
+            # Act
+            tech_analysis_prompt = chat_handler._get_technical_analysis_prompt()
+
+            # Assert
+            assert tech_analysis_prompt == "technical_analysis_mock"
+            mock_get_tech_analysis.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_technical_indicators(self, chat_handler):
+        """Test extracting technical indicators from documents."""
+        # Arrange
+        message = "What's the technical outlook for $AAPL based on RSI and EMA20?"
+        docs = [
+            Document(
+                page_content="The RSI for AAPL is currently at 65, approaching overbought territory.",
+                metadata={"url": "https://example.com/technical/1"},
+            ),
+            Document(
+                page_content="AAPL's EMA-20 is showing a bullish crossover with the SMA-50.",
+                metadata={"url": "https://example.com/technical/2"},
+            ),
+            Document(
+                page_content="A potential head and shoulders pattern is forming on the AAPL daily chart.",
+                metadata={"url": "https://example.com/technical/3"},
+            ),
+        ]
+
+        # Act
+        result = await chat_handler._get_technical_indicators(message, docs)
+
+        # Assert
+        assert "Technical Indicator Data:" in result
+        # Check for indicators in the result
+        assert "ema20" in result.lower() or "ema-20" in result.lower()
+        assert "sma50" in result.lower() or "sma-50" in result.lower()
+        # Check for patterns
+        assert "head and shoulders" in result.lower()
+        # Check for tickers
+        assert "potential tickers identified:" in result.lower()
+        assert "aapl" in result.lower()
+        assert "rsi" in result.lower()  # RSI is identified as a potential ticker
+
+    @pytest.mark.asyncio
+    async def test_process_query_technical_type(self, chat_handler):
+        """Test processing a technical analysis query."""
+        # Arrange
+        message = "What's the MACD showing for TSLA?"
+
+        # Create test documents with technical analysis content
+        docs = [
+            Document(
+                page_content="TSLA's MACD line has crossed above the signal line, indicating bullish momentum.",
+                metadata={"url": "https://example.com/tsla/tech/1", "timestamp_unix": 1672531200.0},
+            ),
+            Document(
+                page_content="The MACD histogram for TSLA is positive and increasing.",
+                metadata={"url": "https://example.com/tsla/tech/2", "timestamp_unix": 1672617600.0},
+            ),
+        ]
+
+        # Mock the router to classify as technical
+        mock_router = AsyncMock()
+        mock_router.classify_query = AsyncMock(return_value="technical")
+        chat_handler._router = mock_router
+
+        # Mock the technical LLM
+        mock_tech_llm = MagicMock(spec=BaseChatModel)
+        mock_tech_llm.ainvoke = AsyncMock(
+            return_value="TSLA's MACD shows bullish momentum with a recent cross above the signal line."
+        )
+        chat_handler._technical_llm = mock_tech_llm
+
+        # Mock the retriever to return our test documents
+        mock_retriever = AsyncMock()
+        mock_retriever.ainvoke = AsyncMock(return_value=docs)
+        chat_handler.knowledge_base.as_retriever = MagicMock(return_value=mock_retriever)
+
+        # Mock _get_technical_indicators to return a fake technical data summary
+        chat_handler._get_technical_indicators = AsyncMock(
+            return_value="Technical Indicator Data:\nIndicators mentioned in context:\n- MACD: mentioned in 2 sources"
+        )
+
+        # Mock the prompt template
+        mock_prompt = MagicMock()
+        with patch.object(chat_handler, "_get_technical_analysis_prompt", return_value=mock_prompt):
+            # Act
+            result = await chat_handler.process_query(message)
+
+            # Assert
+            assert result["query_type"] == "technical"
+            assert "bullish momentum" in result["response"]
+            assert chat_handler._get_technical_indicators.called
+
+            # Verify we used the technical LLM instead of the regular one
+            mock_tech_llm.ainvoke.assert_called_once()
+
+            # Verify we adjusted k for a technical query (should use more documents)
+            assert chat_handler.knowledge_base.as_retriever.call_args[1]["search_kwargs"]["k"] > 5
 
 
 # ================= ADVANCED TESTS =================
@@ -542,7 +685,7 @@ async def test_process_query_trading_thesis():
     expected_min_k = 10
 
     # Create a function that simulates the k adjustment logic for trading_thesis
-    def adjust_k_for_query_type(query_type, k):
+    def adjust_k_for_query_type(query_type: str, k: int) -> int:
         if query_type == "trading_thesis":
             return max(k, expected_min_k)
         return k
@@ -574,7 +717,7 @@ async def test_process_query_default_to_general():
     handler._router = mock_router
 
     # Create a function to test prompt selection logic
-    def get_prompt_for_query_type(query_type):
+    def get_prompt_for_query_type(query_type: str) -> str:
         if query_type == "investment":
             return "investment_prompt"
         elif query_type == "trading_thesis":
@@ -610,7 +753,7 @@ async def test_document_reranking_by_timestamp():
     handler = ChatHandler(knowledge_base=mock_kb)
 
     # Define a helper function that mimics the re-ranking logic from process_query
-    def rerank_documents(documents, k=3):
+    def rerank_documents(documents: List[Document], k: int = 3) -> List[Document]:
         valid_docs_with_ts = []
         for doc in documents:
             timestamp = doc.metadata.get("timestamp_unix")
@@ -658,7 +801,9 @@ async def test_document_timestamp_validation():
     handler = ChatHandler(knowledge_base=mock_kb)
 
     # Define helper function that mimics the validation logic from process_query
-    def validate_and_rank_docs(documents):
+    def validate_and_rank_docs(
+        documents: List[Document],
+    ) -> tuple[list[tuple[Document, float]], int]:
         valid_docs_with_ts = []
         invalid_count = 0
 
@@ -706,7 +851,7 @@ async def test_query_type_specific_handling():
         mock_general_prompt.assert_called_once()
 
     # Test k adjustment for trading_thesis
-    def adjust_k_for_query_type(query_type, k):
+    def adjust_k_for_query_type(query_type: str, k: int) -> int:
         final_k = k
         if query_type == "trading_thesis":
             final_k = max(k, 10)  # Minimum 10 for trading thesis
@@ -731,10 +876,10 @@ async def test_retry_mechanism():
     retry_count = 0
     sleep_delays = []
 
-    async def simulate_retries(max_retries=2, base_delay=0.1):
+    async def simulate_retries(max_retries: int = 2, base_delay: float = 0.1) -> str:
         nonlocal retry_count, sleep_delays
         attempt = 0
-        last_error = ValueError("Initial error")
+        last_error: Exception = ValueError("Initial error")
 
         while attempt <= max_retries:
             try:

@@ -110,6 +110,12 @@ app.include_router(chat_router.router)
 
 # Root endpoint is now in status_router, included above.
 
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
 # Development server execution (if running this file directly)
 if __name__ == "__main__":
     import uvicorn

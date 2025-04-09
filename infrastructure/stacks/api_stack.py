@@ -1,13 +1,9 @@
 # infrastructure/stacks/api_stack.py
 import os
 
-from aws_cdk import (
-    Duration,
-)
+from aws_cdk import Duration
 from aws_cdk import Environment as CdkEnvironment
-from aws_cdk import (
-    Stack,
-)
+from aws_cdk import Stack
 from aws_cdk import aws_apigateway as apigw
 from aws_cdk import aws_ecr_assets as ecr_assets
 from aws_cdk import aws_ecs as ecs
@@ -23,12 +19,6 @@ class ApiStack(Stack):
     def __init__(self, scope: Construct, id: str, env_config: Environment, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Lookup existing secret by name instead of creating a new one
-        # openai_secret = secretsmanager.Secret.from_secret_name_v2(
-        #     self, f"{id}-AgentSmythSecretLookup", # Changed ID slightly
-        #     secret_name="AgentSmyth" # Use the existing secret name
-        # )
-
         # Create Docker image asset
         docker_image = ecr_assets.DockerImageAsset(
             self,
@@ -36,7 +26,7 @@ class ApiStack(Stack):
             directory=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),  # Project root
         )
 
-        # Use NetworkLoadBalancedFargateService
+        # Use NetworkLoadBalancedFargateService with proper health check config
         fargate_service = ecs_patterns.NetworkLoadBalancedFargateService(
             self,
             f"{id}-Service",
@@ -69,6 +59,17 @@ class ApiStack(Stack):
             cpu=8192,
             # Listener port for NLB
             listener_port=80,
+            # Add health check grace period - give app time to start
+            health_check_grace_period=Duration.seconds(120),
+        )
+
+        # Configure the target group's health check
+        fargate_service.target_group.configure_health_check(
+            path="/health",
+            healthy_threshold_count=2,
+            unhealthy_threshold_count=3,
+            timeout=Duration.seconds(5),
+            interval=Duration.seconds(30),
         )
 
         # Create VPC Link

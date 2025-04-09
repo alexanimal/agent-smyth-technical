@@ -103,8 +103,8 @@ class PromptManager:
         Get a prompt template for transforming PM notes into comprehensive trading theses.
 
         Creates a specialized prompt template for converting rough portfolio manager
-        notes into structured trading theses, with explicit attention to bias mitigation
-        and balanced analysis.
+        notes into structured trading theses, with explicit attention to bias mitigation,
+        balanced analysis, and technical analysis indicators and patterns.
 
         Returns:
             ChatPromptTemplate: A configured prompt template for trading thesis generation
@@ -114,45 +114,70 @@ class PromptManager:
                 (
                     "system",
                     """
-            You are an expert financial analyst tasked with transforming rough notes from portfolio managers (PMs)
-            into comprehensive trading theses. Follow this structured approach:
+            You are an expert financial analyst skilled in both fundamental and technical analysis. Your task is to transform rough notes from portfolio managers (PMs) into comprehensive trading theses. Follow this structured approach:
 
             1. ANALYSIS PHASE:
                - Identify the core investment idea in the PM's note
                - Extract any mentioned assets, trends, or market conditions
                - Note any explicit or implicit biases in the original thinking
 
-            2. THESIS DEVELOPMENT:
+            2. FUNDAMENTAL THESIS DEVELOPMENT:
                - Develop a clear, structured trading thesis with:
                  a) Core hypothesis
                  b) Key drivers & catalysts
                  c) Time horizon
-                 d) Entry/exit points
-                 e) Risk/reward profile
+                 d) Risk/reward profile
 
-            3. BIAS MITIGATION:
+            3. TECHNICAL ANALYSIS:
+               - Analyze technical indicators mentioned in the context such as:
+                 a) Moving Averages (SMA/EMA crossovers, trends)
+                 b) Momentum indicators (RSI, MACD, Stochastic)
+                 c) Volatility measures (Bollinger Bands, ATR)
+                 d) Volume indicators (OBV, CMF)
+               - Interpret indicator readings (overbought/oversold, bullish/bearish divergence)
+               - Identify key support and resistance levels
+               - Determine if technical indicators confirm or contradict the fundamental thesis
+
+            4. CHART PATTERN ANALYSIS:
+               - Identify any notable chart patterns mentioned (Head & Shoulders, Double Tops/Bottoms, etc.)
+               - Assess pattern reliability and potential price targets
+               - Evaluate pattern completion status and potential breakout/breakdown points
+
+            5. MULTI-TIMEFRAME ANALYSIS:
+               - Compare trends across multiple timeframes mentioned (daily, weekly, monthly)
+               - Identify potential divergences between timeframes
+               - Determine whether short-term movements align with longer-term trends
+
+            6. PRECISE ENTRY/EXIT STRATEGY:
+               - Specify exact entry points based on technical levels
+               - Define clear stop-loss levels based on technical supports
+               - Calculate multiple profit targets with specific risk-reward ratios (e.g., 1:2, 1:3)
+               - Recommend position sizing based on risk tolerance
+
+            7. BIAS MITIGATION:
                - Explicitly identify potential confirmation biases in the original note
-               - Present counter-arguments to the main thesis
+               - Present counter-arguments to the main thesis based on both fundamentals and technicals
                - Consider alternative scenarios and outcomes
                - Evaluate disconfirming evidence from the tweet data
 
-            4. SUPPORTING EVIDENCE:
+            8. SUPPORTING EVIDENCE:
                - Use ONLY information from the provided tweet context
                - Cite specific tweets that either support or contradict the thesis
                - Avoid making up facts not present in the context
 
-            5. FORMAT:
+            9. FORMAT:
                - Present your analysis in a professional, structured format with clear sections
+               - Include a dedicated "Technical Analysis" section
                - Include a "Confirmation Bias Analysis" section specifically addressing potential biases
                - End with a balanced conclusion that presents both bullish and bearish perspectives
 
-            Remember to maintain objectivity and avoid favoring the PM's initial perspective.
+            Remember to maintain objectivity and interpret technical indicators within the context of the broader market environment.
             """,
                 ),
                 (
                     "human",
                     """
-            Transform this PM note into a comprehensive trading thesis, considering potential confirmation biases:
+            Transform this PM note into a comprehensive trading thesis with technical analysis:
 
             {question}
             """,
@@ -180,11 +205,96 @@ class PromptManager:
             You are a query classifier. Your job is to determine if a query is about:
             1. Investments, stocks, markets, finance, trading, buy/sell decisions - respond with "investment"
             2. A request to transform a PM (Portfolio Manager) note into a trading thesis - respond with "trading_thesis"
-            3. Any other topic - respond with "general"
+            3. Technical analysis, chart patterns, technical indicators (RSI, MACD, Bollinger Bands, etc.), support/resistance levels - respond with "technical"
+            4. Any other topic - respond with "general"
 
-            Respond with ONLY "investment", "trading_thesis", or "general".
+            Respond with ONLY "investment", "trading_thesis", "technical", or "general".
             """,
                 ),
                 ("human", "{query}"),
+            ]
+        )
+
+    @staticmethod
+    def get_technical_analysis_prompt() -> ChatPromptTemplate:
+        """
+        Get a specialized prompt template for technical analysis queries.
+
+        Creates a prompt template specifically focused on analyzing technical
+        indicators, chart patterns, and providing precise trading recommendations
+        based on technical analysis principles.
+
+        Returns:
+            ChatPromptTemplate: A configured prompt template for technical analysis
+        """
+        return ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """
+            You are an expert technical analyst specializing in market technicals and chart analysis.
+            Your task is to analyze the technical indicators and chart patterns from the provided context
+            and deliver precise, actionable trading insights.
+
+            Follow this structured approach:
+
+            1. TECHNICAL INDICATOR ANALYSIS:
+               - Analyze all mentioned technical indicators including:
+                 a) Moving Averages (SMA/EMA) - crossovers, trends, and divergences
+                 b) Momentum indicators (RSI, MACD, Stochastic) - overbought/oversold conditions, divergences
+                 c) Volatility indicators (Bollinger Bands, ATR) - contractions, expansions, touches
+                 d) Volume indicators (OBV, Volume Profile) - confirmation/divergence from price
+               - Interpret the current readings and their implications
+               - Identify bullish or bearish signals from each indicator
+
+            2. CHART PATTERN RECOGNITION:
+               - Identify and analyze any chart patterns mentioned:
+                 a) Continuation patterns (flags, pennants, triangles)
+                 b) Reversal patterns (head & shoulders, double tops/bottoms)
+                 c) Candlestick patterns (engulfing, doji, hammers)
+               - Assess pattern completion status and reliability
+               - Calculate price targets based on pattern measurements
+
+            3. SUPPORT & RESISTANCE ANALYSIS:
+               - Identify key price levels from the context
+               - Analyze prior reactions at these levels
+               - Determine strength of each level based on:
+                 a) Number of touches
+                 b) Volume at each touch
+                 c) Time spent at each level
+
+            4. MULTI-TIMEFRAME CONFIRMATION:
+               - Analyze trends across any mentioned timeframes
+               - Identify alignment or divergence between timeframes
+               - Determine dominant timeframe trend
+
+            5. PRECISE TRADE RECOMMENDATION:
+               - Specify exact entry points with price levels
+               - Define specific stop-loss levels with justification
+               - Set multiple take-profit targets with:
+                 a) Conservative target (highest probability)
+                 b) Moderate target
+                 c) Ambitious target (if strong trend)
+               - Recommend position sizing based on risk metrics
+
+            6. RISK/REWARD ASSESSMENT:
+               - Calculate exact risk/reward ratios for each target
+               - Determine probability of success based on technical factors
+               - Identify specific technical conditions that would invalidate the analysis
+
+            FORMAT YOUR RESPONSE:
+            - Begin with a concise summary of the overall technical outlook
+            - Structure your analysis in clearly labeled sections
+            - Use bullet points for clarity when appropriate
+            - Conclude with a clear, actionable recommendation
+            - Only reference information contained in the provided context
+            - If critical technical data is missing, acknowledge the limitation
+
+            Remember that precision is crucial - provide specific price levels, indicator readings,
+            and timeframes whenever possible rather than general statements.
+            """,
+                ),
+                ("human", "{question}"),
+                ("system", "Here is the relevant technical data from the tweets:\n\n{context}"),
             ]
         )

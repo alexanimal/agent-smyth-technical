@@ -106,6 +106,7 @@ class ChatHandler:
         retry_delay: Base delay in seconds between retry attempts
         _llm: Cached LLM instance (lazy-loaded)
         _router: Cached router instance (lazy-loaded)
+        _technical_llm: Cached LLM instance for technical analysis (lazy-loaded)
     """
 
     def __init__(
@@ -133,6 +134,7 @@ class ChatHandler:
         self.retry_delay = retry_delay
         self._llm: Optional[BaseChatModel] = None
         self._router: Optional[ChatRouter] = None
+        self._technical_llm: Optional[BaseChatModel] = None
 
     @property
     def llm(self) -> BaseChatModel:
@@ -145,6 +147,25 @@ class ChatHandler:
         if self._llm is None:
             self._llm = ChatOpenAI(model=self.model_name, temperature=self.temperature)
         return self._llm
+
+    @property
+    def technical_llm(self) -> BaseChatModel:
+        """
+        Specialized LLM optimized for technical analysis tasks.
+
+        Uses a slightly lower temperature for more deterministic analysis
+        of technical indicators and patterns.
+
+        Returns:
+            BaseChatModel: The initialized chat model for technical analysis
+        """
+        if self._technical_llm is None:
+            # Use the same model but with lower temperature for technical analysis
+            self._technical_llm = ChatOpenAI(
+                model=self.model_name,
+                temperature=max(0, self.temperature - 0.2),  # Lower temperature
+            )
+        return self._technical_llm
 
     @property
     def router(self) -> ChatRouter:
@@ -186,6 +207,105 @@ class ChatHandler:
             ChatPromptTemplate: Prompt template for trading thesis queries
         """
         return PromptManager.get_trading_thesis_prompt()
+
+    def _get_technical_analysis_prompt(self) -> ChatPromptTemplate:
+        """
+        Get a specialized prompt template for technical analysis.
+
+        Returns:
+            ChatPromptTemplate: Prompt template for technical analysis queries
+        """
+        return PromptManager.get_technical_analysis_prompt()
+
+    async def _get_technical_indicators(self, message: str, docs: List[Document]) -> str:
+        """
+        Extract and analyze technical indicators from the query and documents.
+
+        This method identifies potential ticker symbols in the query, extracts
+        technical indicator information from the documents, and formats it
+        for inclusion in the context.
+
+        Args:
+            message: The user's query message
+            docs: List of retrieved documents
+
+        Returns:
+            str: Formatted technical indicator data
+        """
+        # Extract potential ticker symbols from the message
+        # This is a simplified approach - in production, you would use a more robust method
+        import re
+
+        potential_tickers = set(re.findall(r"\$?[A-Z]{1,5}", message))
+
+        # Extract technical indicators from documents
+        technical_data: Dict[str, List[str]] = {}
+        patterns: Dict[str, List[str]] = {}
+        for doc in docs:
+            content = doc.page_content.lower()
+
+            # Extract moving averages
+            ma_matches = re.findall(r"(sma|ema)[\s-]*(\d+)[^\d]", content)
+            for ma_type, period in ma_matches:
+                key = f"{ma_type.upper()}{period}"
+                if key not in technical_data:
+                    technical_data[key] = []
+                technical_data[key].append(doc.metadata.get("url", "unknown"))
+
+            # Extract other indicators
+            indicators = {
+                "rsi": r"rsi[\s-]*(\d+)[^\d]",
+                "macd": r"macd",
+                "stochastic": r"stoch(astic)?",
+                "bollinger": r"bollinger",
+                "volume": r"volume",
+            }
+
+            for ind_name, pattern in indicators.items():
+                if re.search(pattern, content):
+                    if ind_name not in technical_data:
+                        technical_data[ind_name] = []
+                    technical_data[ind_name].append(doc.metadata.get("url", "unknown"))
+
+            # Extract chart patterns
+            chart_patterns = [
+                "head and shoulders",
+                "double top",
+                "double bottom",
+                "triangle",
+                "wedge",
+                "flag",
+                "pennant",
+                "cup and handle",
+            ]
+
+            for pattern in chart_patterns:
+                if pattern in content:
+                    if pattern not in patterns:
+                        patterns[pattern] = []
+                    patterns[pattern].append(doc.metadata.get("url", "unknown"))
+
+        # Format the technical data
+        result = "Technical Indicator Data:\n"
+
+        if technical_data:
+            result += "Indicators mentioned in context:\n"
+            for indicator, sources in technical_data.items():
+                result += f"- {indicator}: mentioned in {len(sources)} sources\n"
+        else:
+            result += "No specific technical indicators found in the context.\n"
+
+        if patterns:
+            result += "\nChart Patterns mentioned in context:\n"
+            for pattern, sources in patterns.items():
+                result += f"- {pattern.title()}: mentioned in {len(sources)} sources\n"
+        else:
+            result += "\nNo specific chart patterns found in the context.\n"
+
+        if potential_tickers:
+            result += f"\nPotential tickers identified: {', '.join(potential_tickers)}\n"
+
+        return result
 
     def _extract_sources(self, documents: List[Document]) -> List[str]:
         """
@@ -244,8 +364,8 @@ class ChatHandler:
 
                 # Adjust k if needed for specific query types
                 final_k = k
-                if query_type == "trading_thesis":
-                    final_k = max(k, 10)  # Fetch more for trading thesis
+                if query_type in ["trading_thesis", "technical"]:
+                    final_k = max(k, 10)  # Fetch more for technical analysis
 
                 # 2. Initial Retrieval (Oversampled)
                 initial_k = final_k * oversample_factor
@@ -295,11 +415,19 @@ class ChatHandler:
                     [doc.page_content for doc in re_ranked_docs]
                 )
 
+                # 4a. For trading_thesis or technical, add technical analysis information
+                if query_type in ["trading_thesis", "technical"]:
+                    logger.debug(f"Adding technical analysis data for {query_type} query")
+                    technical_data = await self._get_technical_indicators(message, re_ranked_docs)
+                    context_string += f"\n\n{technical_data}"
+
                 # 5. Choose Prompt
                 if query_type == "investment":
                     prompt_template = self._get_investment_prompt()
                 elif query_type == "trading_thesis":
                     prompt_template = self._get_trading_thesis_prompt()
+                elif query_type == "technical":
+                    prompt_template = self._get_technical_analysis_prompt()
                 else:  # general
                     prompt_template = self._get_general_prompt()
 
@@ -309,8 +437,16 @@ class ChatHandler:
                     context=RunnableLambda(lambda x: context_string),  # Pass re-ranked context
                     question=RunnablePassthrough(),  # Pass original question
                 )
+
+                # Choose appropriate LLM based on query type
+                model_to_use = (
+                    self.technical_llm
+                    if query_type in ["trading_thesis", "technical"]
+                    else self.llm
+                )
+
                 # Chain: Prepare inputs -> Format prompt -> Call LLM -> Parse output
-                chain = inputs | prompt_template | self.llm | StrOutputParser()
+                chain = inputs | prompt_template | model_to_use | StrOutputParser()
 
                 logger.debug(f"Invoking LLM chain for query type: {query_type}")
                 response = await chain.ainvoke(message)
