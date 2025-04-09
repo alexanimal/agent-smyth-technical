@@ -1,5 +1,7 @@
 # Tweet RAG Agent API
 
+[![codecov](https://codecov.io/github/alexanimal/agent-smyth-technical/graph/badge.svg?token=B2BI5398GF)](https://codecov.io/github/alexanimal/agent-smyth-technical)
+
 ## Overview
 
 This project provides a FastAPI-based API for a Retrieval-Augmented Generation (RAG) agent. The agent uses LangChain and OpenAI's models to answer user queries based on a knowledge base built from tweet data (expected in JSON format). It features automatic query classification, source attribution, background knowledge base loading with persistence, automated code quality checks, CI/CD pipelines, and detailed API documentation.
