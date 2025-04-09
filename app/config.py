@@ -52,7 +52,7 @@ def setup_logging_and_sentry(settings: Settings):
 load_dotenv()
 
 # Create settings instance
-settings = Settings() # type: ignore[call-arg]
+settings = Settings()  # type: ignore[call-arg]
 
 # Perform initial checks
 if not settings.openai_api_key:

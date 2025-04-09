@@ -5,7 +5,7 @@ Module for handling chat interactions using RAG capabilities with conditional or
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Set, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from langchain.chains import RetrievalQA
 from langchain_core.documents import Document
@@ -206,4 +206,6 @@ class ChatHandler:
         if isinstance(last_error, BaseException):
             raise last_error
         else:
-            raise RuntimeError(f"Chat processing failed after multiple retries, but no specific error captured.")
+            raise RuntimeError(
+                f"Chat processing failed after multiple retries, but no specific error captured."
+            )

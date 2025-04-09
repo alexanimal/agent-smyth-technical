@@ -30,6 +30,7 @@ CHUNK_OVERLAP = 100
 
 class KnowledgeBaseManager:
     """Manages the creation, storage, and retrieval of the knowledge base."""
+
     mocks_dir: str
     index_path: str
     documents_pickle_path: str

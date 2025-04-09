@@ -72,7 +72,7 @@ async def get_current_chat_handler() -> ChatHandler:
             # If not loading and no handler, it failed
             detail = "Knowledge base failed to initialize. Check server logs."
         raise HTTPException(status_code=status_code, detail=detail)
-    assert app_state["chat_handler"] is not None # Assure mypy it's not None here
+    assert app_state["chat_handler"] is not None  # Assure mypy it's not None here
     # Use cast to be explicit about the type for mypy
     return cast(ChatHandler, app_state["chat_handler"])
 
