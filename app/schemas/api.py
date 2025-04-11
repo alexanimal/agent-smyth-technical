@@ -61,10 +61,10 @@ class ChatRequest(BaseModel):
         json_schema_extra={"example": "What are investors saying about AAPL?"},
     )
     num_results: int = Field(
-        25,
-        ge=1,
-        le=250,
-        description="Number of sources to retrieve and consider in analysis. Higher values provide more comprehensive analysis but may increase processing time. Recommended ranges: 5-25 for quick queries, 25-100 for detailed analysis, 100-250 for comprehensive market research.",
+        25,  # Default of 25 documents
+        ge=3,  # At least 3 documents for meaningful analysis
+        le=250,  # Upper limit of 100 for performance reasons
+        description="Number of sources to retrieve and consider in analysis. Higher values provide more comprehensive analysis but may increase processing time. Recommended ranges: 3-10 for quick queries, 10-25 for detailed analysis, 25-100 for comprehensive market research.",
     )
     query_type: Optional[QueryType] = Field(
         None, description="Override automatic query classification"

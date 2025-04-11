@@ -190,7 +190,7 @@ class ChatHandler:
         """
         return extract_sources(documents)
 
-    async def process_query(self, message: str, k: int = 5) -> Dict[str, Any]:
+    async def process_query(self, message: str, k: int = 25) -> Dict[str, Any]:
         """
         Process a user query using the LangGraph workflow.
 
@@ -200,7 +200,7 @@ class ChatHandler:
 
         Args:
             message: The user's query text
-            k: Number of documents to retrieve (default: 5)
+            k: Number of documents to retrieve (default: 25)
 
         Returns:
             Dictionary containing the response, sources, and metadata
@@ -216,7 +216,16 @@ class ChatHandler:
                 start_time = time.time()
 
                 # Initialize the state
-                initial_state = {"query": message, "retrieved_docs": [], "ranked_docs": []}
+                initial_state = {
+                    "query": message,
+                    "retrieved_docs": [],
+                    "ranked_docs": [],
+                    "response": "",
+                    "sources": [],
+                    "classification": {},
+                    "alternative_viewpoints": None,
+                    "num_results": k,  # Include the user-requested document count
+                }
 
                 # Run the workflow
                 result_state = await app_workflow.ainvoke(initial_state)

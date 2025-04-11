@@ -27,6 +27,7 @@ class RAGState(TypedDict):
         response: The generated response text
         sources: List of source URLs used to generate the response
         alternative_viewpoints: Optional alternative perspective or counterargument
+        num_results: The number of results requested by the user
     """
 
     query: str
@@ -36,3 +37,4 @@ class RAGState(TypedDict):
     response: Optional[str]
     sources: List[str]
     alternative_viewpoints: Optional[str]
+    num_results: int  # Number of results requested by the user

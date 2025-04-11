@@ -47,6 +47,7 @@ class TestClassifyQueryNode:
                 "is_mixed": False,
             },
             "alternative_viewpoints": None,
+            "num_results": 25,
         }
 
     @pytest.mark.asyncio
@@ -153,6 +154,55 @@ class TestClassifyQueryNode:
             assert result["classification"]["query_type"] == "general"
             assert result["classification"]["confidence_scores"]["general"] == 100
 
+    @pytest.mark.asyncio
+    async def test_basic_classification(self, mock_state):
+        """Test basic query classification."""
+        # Create a mock chain instance that returns a valid JSON string
+        with patch("app.rag.nodes.ChatOpenAI", autospec=True) as mock_model:
+            mock_chain = MagicMock()
+            # Properly mocked return value for classification as JSON string
+            mock_chain.ainvoke.return_value = (
+                '{"technical": 10, "trading_thesis": 5, "investment": 80, "general": 5}'
+            )
+
+            # Connect the mocked chain to the LLM's | operator
+            with patch(
+                "app.rag.nodes.classification_prompt | classifier_model | StrOutputParser()",
+                new=mock_chain,
+            ):
+                # Execute the function
+                result = await classify_query_node(mock_state)
+
+        # Assertions on the result
+        assert "classification" in result
+        assert result["classification"]["query_type"] == "investment"
+        assert result["classification"]["confidence_scores"]["investment"] == 80
+        assert result["classification"]["confidence_scores"]["technical"] == 10
+        assert not result["classification"]["is_mixed"]
+
+    @pytest.mark.asyncio
+    async def test_basic_classification_error_handling(self):
+        """Test error handling in classification."""
+        # Create a basic state
+        state: RAGState = {
+            "query": "Test query",
+            "retrieved_docs": [],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "classification": {},
+            "alternative_viewpoints": None,
+            "num_results": 25,  # Add this field
+        }
+
+        # Force an exception in the chain
+        with patch("app.rag.nodes.chain.ainvoke", side_effect=Exception("Test error")):
+            result = await classify_query_node(state)
+
+        # Should set default classification on error
+        assert result["classification"]["query_type"] == "general"
+        assert result["classification"]["confidence_scores"]["general"] == 100
+
 
 class TestRetrieveDocumentsNode:
     """Tests for the retrieve_documents_node function."""
@@ -172,6 +222,7 @@ class TestRetrieveDocumentsNode:
                 "is_mixed": False,
             },
             "alternative_viewpoints": None,
+            "num_results": 25,
         }
 
     @pytest.mark.asyncio
@@ -311,23 +362,96 @@ class TestRetrieveDocumentsNode:
                 retriever_kwargs["search_kwargs"]["k"] == 30
             )  # Higher k (10) * oversample factor (3)
 
+    @pytest.mark.asyncio
+    async def test_retrieve_documents_respects_num_results(self):
+        """Test that retrieve_documents_node uses the num_results parameter."""
+        # Create a mock state with different num_results values
+        state: RAGState = {
+            "query": "What is the current stock price?",
+            "classification": {
+                "query_type": "investment",
+                "confidence_scores": {"investment": 80, "technical": 10, "general": 10},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 15,  # Specific number of results to test
+        }
+
+        # Mock the knowledge base and retriever
+        mock_kb = AsyncMock()
+        mock_kb.as_retriever.return_value = AsyncMock()
+        mock_kb.as_retriever.return_value.ainvoke = AsyncMock(return_value=[])
+
+        # Mock the KnowledgeBaseManager
+        with patch("app.kb.KnowledgeBaseManager", autospec=True) as mock_kb_manager_class:
+            # Setup the mock
+            mock_kb_manager_instance = mock_kb_manager_class.return_value
+            mock_kb_manager_instance.load_or_create_kb = AsyncMock(return_value=mock_kb)
+
+            # Call the node function
+            await retrieve_documents_node(state)
+
+            # Verify the retriever was called with the expected k value
+            # For investment queries, it should use the user-provided value
+            # with the oversample factor of 3
+            expected_k = 15 * 3  # base_k * oversample_factor
+            mock_kb.as_retriever.assert_called_once()
+            mock_kb.as_retriever.assert_called_with(search_kwargs={"k": expected_k})
+
+    @pytest.mark.asyncio
+    async def test_retrieve_documents_respects_num_results_for_complex_queries(self):
+        """Test that retrieve_documents_node adjusts num_results for complex queries."""
+        # Create a mock state for a complex query type
+        state: RAGState = {
+            "query": "What are the technical indicators for AAPL?",
+            "classification": {
+                "query_type": "technical",  # Complex query type
+                "confidence_scores": {"technical": 80, "investment": 10, "general": 10},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 7,  # Small number to trigger adjustment
+        }
+
+        # Mock the knowledge base and retriever
+        mock_kb = AsyncMock()
+        mock_kb.as_retriever.return_value = AsyncMock()
+        mock_kb.as_retriever.return_value.ainvoke = AsyncMock(return_value=[])
+
+        # Mock the KnowledgeBaseManager
+        with patch("app.kb.KnowledgeBaseManager", autospec=True) as mock_kb_manager_class:
+            # Setup the mock
+            mock_kb_manager_instance = mock_kb_manager_class.return_value
+            mock_kb_manager_instance.load_or_create_kb = AsyncMock(return_value=mock_kb)
+
+            # Call the node function
+            await retrieve_documents_node(state)
+
+            # For technical queries with small num_results, it should adjust up to min(int(7 * 1.5), 7 + 5)
+            # Which is min(10, 12) = 10
+            expected_base_k = 10
+            expected_k = expected_base_k * 3  # With oversample factor
+            mock_kb.as_retriever.assert_called_once()
+            mock_kb.as_retriever.assert_called_with(search_kwargs={"k": expected_k})
+
 
 class TestRankDocumentsNode:
     """Tests for the rank_documents_node function."""
 
     @pytest.fixture
-    def mock_state_with_docs(self) -> RAGState:
-        """Create a mock state with retrieved documents for testing."""
-        mock_docs = [
-            Document(page_content="Doc 1", metadata={"url": "url1", "timestamp_unix": 1000.0}),
-            Document(page_content="Doc 2", metadata={"url": "url2", "timestamp_unix": 3000.0}),
-            Document(page_content="Doc 3", metadata={"url": "url3", "timestamp_unix": 2000.0}),
-            Document(
-                page_content="Doc 4", metadata={"url": "url4", "timestamp_unix": None}
-            ),  # Invalid timestamp
-            Document(page_content="Doc 5", metadata={"url": "url5"}),  # Missing timestamp
-        ]
-
+    def mock_state(self) -> RAGState:
+        """Create a mock state for testing."""
+        doc1 = Document(page_content="Test content 1", metadata={"timestamp_unix": 1000.0})
+        doc2 = Document(page_content="Test content 2", metadata={"timestamp_unix": 2000.0})
+        doc3 = Document(page_content="Test content 3", metadata={"timestamp_unix": 3000.0})
         return {
             "query": "What is the current stock price?",
             "classification": {
@@ -335,18 +459,19 @@ class TestRankDocumentsNode:
                 "confidence_scores": {"investment": 80, "technical": 10, "general": 10},
                 "is_mixed": False,
             },
-            "retrieved_docs": mock_docs,
+            "retrieved_docs": [doc1, doc2, doc3],
             "ranked_docs": [],
             "response": "",
             "sources": [],
             "alternative_viewpoints": None,
+            "num_results": 25,
         }
 
     @pytest.mark.asyncio
-    async def test_rank_documents_standard(self, mock_state_with_docs):
+    async def test_rank_documents_standard(self, mock_state):
         """Test document ranking with standard settings."""
         # Call the function
-        result = await rank_documents_node(mock_state_with_docs)
+        result = await rank_documents_node(mock_state)
 
         # Assertions
         assert "ranked_docs" in result
@@ -357,13 +482,13 @@ class TestRankDocumentsNode:
         assert timestamps == [3000.0, 2000.0, 1000.0]  # Descending order
 
     @pytest.mark.asyncio
-    async def test_rank_documents_technical(self, mock_state_with_docs):
+    async def test_rank_documents_technical(self, mock_state):
         """Test document ranking with technical query type (higher k)."""
         # Modify state for technical query
-        mock_state_with_docs["classification"]["query_type"] = "technical"
+        mock_state["classification"]["query_type"] = "technical"
 
         # Call the function
-        result = await rank_documents_node(mock_state_with_docs)
+        result = await rank_documents_node(mock_state)
 
         # Assertions
         assert "ranked_docs" in result
@@ -371,9 +496,8 @@ class TestRankDocumentsNode:
 
     @pytest.mark.asyncio
     async def test_rank_documents_no_docs(self):
-        """Test document ranking with no documents."""
-        # Create state with no documents
-        state = {
+        """Test ranking with no documents."""
+        state: RAGState = {
             "query": "What is the current stock price?",
             "classification": {
                 "query_type": "investment",
@@ -385,43 +509,35 @@ class TestRankDocumentsNode:
             "response": "",
             "sources": [],
             "alternative_viewpoints": None,
+            "num_results": 25,
         }
 
-        # Call the function
-        result = await rank_documents_node(state)  # type: ignore
-
-        # Assertions
-        assert "ranked_docs" in result
+        result = await rank_documents_node(state)
         assert result["ranked_docs"] == []
 
     @pytest.mark.asyncio
     async def test_rank_documents_invalid_timestamps(self):
-        """Test document ranking with all invalid timestamps."""
-        # Create state with all invalid documents
-        invalid_docs = [
-            Document(page_content="Doc 1", metadata={"url": "url1", "timestamp_unix": "invalid"}),
-            Document(page_content="Doc 2", metadata={"url": "url2"}),  # Missing timestamp
-        ]
+        """Test ranking with invalid timestamps."""
+        doc1 = Document(page_content="Test content 1", metadata={"timestamp_unix": None})
+        doc2 = Document(page_content="Test content 2", metadata={})
+        doc3 = Document(page_content="Test content 3", metadata={"timestamp_unix": "invalid"})
 
-        state = {
+        state: RAGState = {
             "query": "What is the current stock price?",
             "classification": {
                 "query_type": "investment",
                 "confidence_scores": {"investment": 80, "technical": 10, "general": 10},
                 "is_mixed": False,
             },
-            "retrieved_docs": invalid_docs,
+            "retrieved_docs": [doc1, doc2, doc3],
             "ranked_docs": [],
             "response": "",
             "sources": [],
             "alternative_viewpoints": None,
+            "num_results": 25,
         }
 
-        # Call the function
-        result = await rank_documents_node(state)  # type: ignore
-
-        # Assertions
-        assert "ranked_docs" in result
+        result = await rank_documents_node(state)
         assert result["ranked_docs"] == []
 
 
@@ -429,35 +545,27 @@ class TestGenerateResponseNode:
     """Tests for the generate_response_node function."""
 
     @pytest.fixture
-    def mock_state_with_ranked_docs(self) -> RAGState:
-        """Create a mock state with ranked documents for testing."""
-        mock_docs = [
-            Document(
-                page_content="AAPL price is $200",
-                metadata={"url": "source1", "timestamp_unix": 1620000000},
-            ),
-            Document(
-                page_content="AAPL trading at $200",
-                metadata={"url": "source2", "timestamp_unix": 1620000001},
-            ),
-        ]
-
+    def mock_state(self) -> RAGState:
+        """Create a mock state for testing."""
+        doc1 = Document(page_content="Test content 1", metadata={"url": "https://source1.com"})
+        doc2 = Document(page_content="Test content 2", metadata={"url": "https://source2.com"})
         return {
-            "query": "What is the current price of AAPL stock?",
+            "query": "What is the current stock price?",
             "classification": {
                 "query_type": "investment",
                 "confidence_scores": {"investment": 80, "technical": 10, "general": 10},
                 "is_mixed": False,
             },
             "retrieved_docs": [],
-            "ranked_docs": mock_docs,
+            "ranked_docs": [doc1, doc2],
             "response": "",
             "sources": [],
             "alternative_viewpoints": None,
+            "num_results": 25,  # Add this field
         }
 
     @pytest.mark.asyncio
-    async def test_generate_response_investment(self, mock_state_with_ranked_docs):
+    async def test_generate_response_investment(self, mock_state):
         """Test response generation for investment query type."""
         # Prepare expected response
         expected_response = "AAPL is currently trading at $200."
@@ -486,7 +594,7 @@ class TestGenerateResponseNode:
             mock_chain.ainvoke = AsyncMock(return_value=expected_response)
 
             # Call the function
-            result = await generate_response_node(mock_state_with_ranked_docs)
+            result = await generate_response_node(mock_state)
 
             # Assertions
             assert "response" in result
@@ -503,11 +611,11 @@ class TestGenerateResponseNode:
             mock_chat_openai.assert_called_once_with(model="gpt-4o", temperature=0.0)
 
     @pytest.mark.asyncio
-    async def test_generate_response_technical(self, mock_state_with_ranked_docs):
+    async def test_generate_response_technical(self, mock_state):
         """Test response generation for technical query type."""
         # Modify state for technical query
-        mock_state_with_ranked_docs["classification"]["query_type"] = "technical"
-        mock_state_with_ranked_docs["classification"]["confidence_scores"] = {
+        mock_state["classification"]["query_type"] = "technical"
+        mock_state["classification"]["confidence_scores"] = {
             "technical": 80,
             "investment": 10,
             "general": 10,
@@ -538,7 +646,7 @@ class TestGenerateResponseNode:
             mock_chain.ainvoke = AsyncMock(return_value=expected_response)
 
             # Call the function
-            result = await generate_response_node(mock_state_with_ranked_docs)
+            result = await generate_response_node(mock_state)
 
             # Assertions
             assert result["response"] == expected_response
@@ -547,13 +655,13 @@ class TestGenerateResponseNode:
             mock_prompt_manager.get_technical_analysis_prompt.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_generate_response_no_docs(self, mock_state_with_ranked_docs):
+    async def test_generate_response_no_docs(self, mock_state):
         """Test response generation with no documents."""
         # Modify state to have no ranked docs
-        mock_state_with_ranked_docs["ranked_docs"] = []
+        mock_state["ranked_docs"] = []
 
         # Call the function
-        result = await generate_response_node(mock_state_with_ranked_docs)
+        result = await generate_response_node(mock_state)
 
         # Assertions
         assert "response" in result
@@ -565,35 +673,27 @@ class TestGenerateAlternativeNode:
     """Tests for the generate_alternative_node function."""
 
     @pytest.fixture
-    def mock_state_with_response(self) -> RAGState:
-        """Create a mock state with a response for testing."""
-        mock_docs = [
-            Document(
-                page_content="AAPL price is $200",
-                metadata={"url": "source1", "timestamp_unix": 1620000000},
-            ),
-            Document(
-                page_content="AAPL trading at $200",
-                metadata={"url": "source2", "timestamp_unix": 1620000001},
-            ),
-        ]
-
+    def mock_state(self) -> RAGState:
+        """Create a mock state for testing."""
+        doc1 = Document(page_content="Test content 1", metadata={"url": "https://source1.com"})
+        doc2 = Document(page_content="Test content 2", metadata={"url": "https://source2.com"})
         return {
-            "query": "What is the current price of AAPL stock?",
+            "query": "What is the current stock price?",
             "classification": {
                 "query_type": "investment",
                 "confidence_scores": {"investment": 80, "technical": 10, "general": 10},
                 "is_mixed": False,
             },
             "retrieved_docs": [],
-            "ranked_docs": mock_docs,
-            "response": "AAPL is currently trading at $200.",
-            "sources": ["source1", "source2"],
+            "ranked_docs": [doc1, doc2],
+            "response": "Test response",
+            "sources": ["https://source1.com", "https://source2.com"],
             "alternative_viewpoints": None,
+            "num_results": 25,  # Add this field
         }
 
     @pytest.mark.asyncio
-    async def test_generate_alternative_investment(self, mock_state_with_response):
+    async def test_generate_alternative_investment(self, mock_state):
         """Test alternative viewpoint generation for investment query type."""
         # Prepare expected alternative
         expected_alternative = "AAPL's current price may be overvalued."
@@ -620,7 +720,7 @@ class TestGenerateAlternativeNode:
             mock_chain.ainvoke = AsyncMock(return_value=expected_alternative)
 
             # Call the function
-            result = await generate_alternative_node(mock_state_with_response)
+            result = await generate_alternative_node(mock_state)
 
             # Assertions
             assert "alternative_viewpoints" in result
@@ -633,24 +733,24 @@ class TestGenerateAlternativeNode:
             mock_chat_openai.assert_called_once_with(model="gpt-4o", temperature=0.7)
 
     @pytest.mark.asyncio
-    async def test_generate_alternative_general(self, mock_state_with_response):
+    async def test_generate_alternative_general(self, mock_state):
         """Test alternative viewpoint generation for general query type (should skip)."""
         # Modify state for general query
-        mock_state_with_response["classification"]["query_type"] = "general"
-        mock_state_with_response["classification"]["confidence_scores"] = {
+        mock_state["classification"]["query_type"] = "general"
+        mock_state["classification"]["confidence_scores"] = {
             "general": 80,
             "investment": 10,
             "technical": 10,
         }
 
         # Call the function with no patches since it should be skipped
-        result = await generate_alternative_node(mock_state_with_response)
+        result = await generate_alternative_node(mock_state)
 
         # Assertions
         assert result["alternative_viewpoints"] is None  # Should be None for general
 
     @pytest.mark.asyncio
-    async def test_generate_alternative_error(self, mock_state_with_response):
+    async def test_generate_alternative_error(self, mock_state):
         """Test error handling in alternative viewpoint generation."""
         # Create patches
         with (
@@ -674,7 +774,7 @@ class TestGenerateAlternativeNode:
             mock_chain.ainvoke = AsyncMock(side_effect=Exception("API error"))
 
             # Call the function
-            result = await generate_alternative_node(mock_state_with_response)
+            result = await generate_alternative_node(mock_state)
 
             # Assertions
             assert result["alternative_viewpoints"] is None  # Should be None on error

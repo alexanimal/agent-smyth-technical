@@ -115,13 +115,22 @@ async def retrieve_documents_node(state: RAGState) -> RAGState:
     query = state["query"]
     classification = state["classification"]
 
-    # Adjust k based on query type
-    k = 5  # Default
+    # Use user-provided num_results with reasonable constraints
+    user_k = state["num_results"]
+
+    # Apply query-type-based adjustments but respect user preferences
+    base_k = user_k
     if (
         classification["query_type"] in ["trading_thesis", "technical"]
         or classification["is_mixed"]
     ):
-        k = 10
+        # For complex queries, increase the base k by 50% if user didn't specify a large number
+        if user_k < 10:
+            base_k = min(int(user_k * 1.5), user_k + 5)  # Increase but cap the increase
+
+    # Oversample for better diversity
+    oversample_factor = 3
+    initial_k = base_k * oversample_factor
 
     # Create a knowledge base instance (typically this would be passed in or accessed via dependency)
     # This is a placeholder - you would replace with your actual KB implementation
@@ -129,10 +138,6 @@ async def retrieve_documents_node(state: RAGState) -> RAGState:
 
     kb_manager = KnowledgeBaseManager()
     kb = await kb_manager.load_or_create_kb()
-
-    # Oversample for better diversity
-    oversample_factor = 3
-    initial_k = k * oversample_factor
 
     # Retrieve documents
     retriever = kb.as_retriever(search_kwargs={"k": initial_k})
@@ -160,11 +165,15 @@ async def rank_documents_node(state: RAGState) -> RAGState:
     docs = state["retrieved_docs"]
     query_type = state["classification"]["query_type"]
     is_mixed = state["classification"]["is_mixed"]
+    user_k = state["num_results"]
 
-    # Determine final k
-    final_k = 5  # Default
+    # Determine final k based on user request and query type
+    final_k = user_k
     if query_type in ["trading_thesis", "technical"] or is_mixed:
-        final_k = 10
+        # For complex queries, we might want to provide slightly more results
+        # But still respect user's request as a general guideline
+        if user_k < 10:
+            final_k = min(int(user_k * 1.5), user_k + 5)
 
     # Extract timestamp metadata for each document
     valid_docs_with_ts = []
