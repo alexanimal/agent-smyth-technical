@@ -39,6 +39,7 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
     *   Uses parallel processing for faster document loading.
     *   Persists the FAISS vector store index and processed documents to disk (`faiss_index` directory) using pickle for efficient restarts.
     *   Includes integrity checks for the saved index.
+*   **Advanced Prompt Engineering:** Implements sophisticated prompting techniques like Chain-of-Thought and Self-Evaluation.
 *   **Poetry Dependency Management:** Uses Poetry for clear dependency declaration and environment management (`pyproject.toml`, `poetry.lock`).
 *   **Automated Code Quality:** Integrates `pre-commit` hooks with `black` and `isort` for consistent code formatting and import sorting before commits.
 *   **CI/CD Pipelines:** Includes GitHub Actions workflows (`ci.yaml`, `cd.yml`) for automated testing on push/pull requests and deployment on merges to main.
@@ -80,8 +81,27 @@ The application is organized into several modules, each with specific responsibi
    - Dependency injection for FastAPI
    - [View Services Documentation](/app/services/README.md)
 
-6. **Core Module** (`/app/core`): Core business logic components
-7. **Config Module** (`/app/config`): Application configuration and settings
+6. **Prompts Module** (`/app/prompts`): Template management for LLM interactions:
+   - Centralized prompt management
+   - Dynamic prompt construction based on query type
+   - Advanced prompting techniques (Chain-of-Thought, Tree-of-Thought)
+   - [View Prompts Documentation](/app/prompts/README.md)
+
+7. **Middleware Module** (`/app/middleware`): Request processing layers:
+   - Logging and monitoring
+   - Authentication and authorization
+   - Error handling and response formatting
+   - [View Middleware Documentation](/app/middleware/README.md)
+
+8. **Knowledge Base Module** (`/app/kb`): Data storage and retrieval:
+   - Tweet data ingestion and processing
+   - Vector embeddings and similarity search
+   - Persistence and caching
+   - [View KB Documentation](/app/kb/README.md)
+
+9. **Core Module** (`/app/core`): Core business logic components
+
+10. **Config Module** (`/app/config`): Application configuration and settings
 
 ## Prerequisites
 
@@ -307,6 +327,7 @@ This project is actively maintained. Current development focuses on:
 - Adding support for additional query types
 - Improving document ranking algorithms
 - Enhancing alternative viewpoint generation
+- Implementing more advanced prompt engineering techniques
 
 ## Contributing
 
