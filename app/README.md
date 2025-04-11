@@ -13,6 +13,9 @@ This application implements a Retrieval Augmented Generation (RAG) system for an
   - [Services Module](#services-appservices)
   - [Core Module](#core-appcore)
   - [Config Module](#config-appconfig)
+  - [Prompts Module](#prompts-appprompts)
+  - [Middleware](#middleware-appmiddleware)
+  - [Knowledge Base](#kb-appkb)
 - [Data Flow](#data-flow)
 - [Configuration](#configuration)
 - [Running the Application](#running-the-application)
@@ -96,6 +99,51 @@ Configuration management:
 - Environment-specific settings
 - Constants and defaults
 - Configuration loading and validation
+
+### Prompts Module (`/app/prompts`)
+
+The Prompts module manages all prompting templates used throughout the RAG system:
+
+- `PromptManager`: Central class for managing and accessing prompt templates
+- Template creation for different query types (technical, investment, etc.)
+- Dynamic prompt construction based on context and query classification
+- Chain-of-Thought prompting techniques for complex reasoning
+
+The system uses several advanced prompting techniques:
+- Self-Evaluation (SE) for high-confidence responses
+- Chain-of-Verification (CoVe) to reduce hallucinations
+- Tree-of-Thought (ToT) for complex financial analysis queries
+
+### Middleware (`/app/middleware`)
+
+FastAPI middleware implementations for request processing:
+
+- `RequestLoggingMiddleware`: Logs all incoming requests with timing information
+- `ResponseHeaderMiddleware`: Adds custom headers to all responses
+- `APIKeyMiddleware`: Validates API keys for protected endpoints
+- `CORSMiddleware`: Configures Cross-Origin Resource Sharing
+- `ErrorHandlingMiddleware`: Provides consistent error responses
+
+### Knowledge Base (`/app/kb`)
+
+The Knowledge Base module manages document storage and retrieval:
+
+- `KnowledgeBaseManager`: Core class for KB operations
+- Tweet data ingestion and processing pipeline
+- Document chunking and embedding generation
+- FAISS vector store management for similarity search
+- Persistence layer for saving/loading the KB
+- Background initialization with progress tracking
+- Integrity verification of loaded KB instances
+
+The KB provides methods for:
+- `initialize()`: Create or load the knowledge base
+- `search(query, k)`: Retrieve relevant documents
+- `add_documents(documents)`: Extend the KB with new documents
+- `health_check()`: Verify KB integrity
+- `get_stats()`: Return statistics about the knowledge base
+
+The system loads tweet data from the `data/` directory, processes it using parallel workers, and creates a FAISS index for efficient retrieval. The index is persisted to disk in the `faiss_index/` directory for faster startup on subsequent runs.
 
 ## Data Flow
 
