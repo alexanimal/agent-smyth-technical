@@ -67,13 +67,19 @@ async def handle_chat(
             f"Processing chat request {request_id} for message: '{request_body.message[:50]}...'"
         )
 
+        # Log if a specific model was requested
+        model_value = request_body.model.value if request_body.model else None
+        if model_value:
+            logger.info(f"Using custom model: {model_value}")
+
         # Process the query using the injected chat_service
         result = await chat_service.process_query(
             message=request_body.message,
             k=request_body.num_results,
             ranking_weights=request_body.ranking_weights,
-            # Pass other relevant fields if needed, e.g., model override
-            # model_override=request_body.model
+            model=model_value,
+            context=request_body.context,
+            generate_alternative_viewpoint=request_body.generate_alternative_viewpoint,
         )
 
         processing_time = time.time() - start_time  # Calculate actual time if needed here
@@ -140,6 +146,7 @@ async def stream_chat(
 
     - **message**: The user's query text (required). Length/content validation applies.
     - **num_results**: Number of sources to retrieve (default: 25, max: 250).
+    - **model**: Optional override for the LLM model.
 
     The stream contains the following events:
     - **start**: Indicates the start of processing
@@ -154,6 +161,9 @@ async def stream_chat(
     # API Key Validation
     if settings.environment == "production" and (not x_api_key or x_api_key != settings.api_key):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+    # Extract model value if specified
+    model_value = request_body.model.value if request_body.model else None
 
     async def event_generator():
         """Generate SSE events for streaming response."""
@@ -174,6 +184,9 @@ async def stream_chat(
                 message=request_body.message,
                 k=request_body.num_results,
                 ranking_weights=request_body.ranking_weights,
+                model=model_value,
+                context=request_body.context,
+                generate_alternative_viewpoint=request_body.generate_alternative_viewpoint,
             )
 
             # For demonstration, split the response into chunks

@@ -64,6 +64,7 @@ async def test_stream_chat_endpoint():
         num_results=3,
         verbose=True,
         query_type=QueryType.INVESTMENT,
+        generate_alternative_viewpoint=True,
         ranking_weights={
             "recency_weight": 0.3,
             "view_weight": 0.3,
@@ -120,6 +121,8 @@ async def test_stream_chat_endpoint():
         assert "complete" in event_types
 
         # Verify the handler was called with correct arguments
+        from unittest.mock import ANY
+
         mock_handler.process_query.assert_called_once_with(
             message=TEST_QUERY,
             k=3,
@@ -129,6 +132,9 @@ async def test_stream_chat_endpoint():
                 "like_weight": 0.2,
                 "retweet_weight": 0.2,
             },
+            model=ANY,
+            context=ANY,
+            generate_alternative_viewpoint=True,
         )
 
         # Verify the complete event has the expected data
@@ -154,6 +160,7 @@ async def test_stream_chat_error_handling():
         num_results=3,
         query_type=QueryType.INVESTMENT,
         verbose=True,
+        generate_alternative_viewpoint=False,
         ranking_weights={
             "recency_weight": 0.3,
             "view_weight": 0.3,

@@ -1,11 +1,11 @@
 """
-Middleware package for the RAG Agent application.
+Middleware module for the RAG Agent application.
 
-This package re-exports middleware functions from the request_logging module
-to maintain backward compatibility.
+This module provides middleware for various aspects of the API, including
+request logging, error handling, and authentication.
 """
 
-from app.middleware.request_logging import log_requests
+from .exception_handlers import ModelValidationError, add_exception_handlers
+from .request_logging import log_requests
 
-# For backward compatibility
-__all__ = ["log_requests"]
+__all__ = ["log_requests", "ModelValidationError", "add_exception_handlers"]

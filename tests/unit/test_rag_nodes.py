@@ -15,6 +15,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.rag.nodes import (
+    PromptManager,
     classify_query_node,
     generate_alternative_node,
     generate_response_node,
@@ -52,6 +53,8 @@ class TestClassifyQueryNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
     @pytest.mark.asyncio
@@ -103,7 +106,7 @@ class TestClassifyQueryNode:
         """Test error handling in query classification."""
         # Create patches for the classification process
         with (
-            patch("app.rag.nodes.ChatOpenAI") as mock_chat_openai,
+            patch("app.rag.utils.ChatOpenAI") as mock_chat_openai,
             patch("app.rag.nodes.PromptManager.get_classification_prompt") as mock_get_prompt,
         ):
 
@@ -135,7 +138,7 @@ class TestClassifyQueryNode:
 
         # Create patches for the classification process
         with (
-            patch("app.rag.nodes.ChatOpenAI") as mock_chat_openai,
+            patch("app.rag.utils.ChatOpenAI") as mock_chat_openai,
             patch("app.rag.nodes.PromptManager.get_classification_prompt") as mock_get_prompt,
         ):
 
@@ -208,6 +211,8 @@ class TestClassifyQueryNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
         # Create a mock chain that raises an exception
@@ -217,7 +222,7 @@ class TestClassifyQueryNode:
         # Patch PromptManager, model and chain construction
         with (
             patch("app.rag.nodes.PromptManager") as mock_prompt_manager,
-            patch("app.rag.nodes.ChatOpenAI") as mock_chat_openai,
+            patch("app.rag.utils.ChatOpenAI") as mock_chat_openai,
             patch("app.rag.nodes.StrOutputParser") as mock_str_parser,
         ):
             # Set up the mocks
@@ -236,6 +241,7 @@ class TestClassifyQueryNode:
         # Should set default classification on error
         assert result["classification"]["query_type"] == "general"
         assert result["classification"]["confidence_scores"]["general"] == 100
+        assert "error" in result["classification"]
 
 
 class TestRetrieveDocumentsNode:
@@ -261,6 +267,8 @@ class TestRetrieveDocumentsNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
     @pytest.mark.asyncio
@@ -421,6 +429,8 @@ class TestRetrieveDocumentsNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
         # Create mock documents
@@ -479,6 +489,8 @@ class TestRetrieveDocumentsNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
         # Create mock documents
@@ -549,6 +561,8 @@ class TestRankDocumentsNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
     @pytest.mark.asyncio
@@ -598,6 +612,8 @@ class TestRankDocumentsNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
         result = await rank_documents_node(state)
@@ -627,6 +643,8 @@ class TestRankDocumentsNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
         result = await rank_documents_node(state)
@@ -651,13 +669,15 @@ class TestGenerateResponseNode:
             "retrieved_docs": [],
             "ranked_docs": [doc1, doc2],
             "response": "",
-            "sources": [],
+            "sources": ["https://source1.com", "https://source2.com"],
             "alternative_viewpoints": None,
             "num_results": 25,
             "ranking_config": {
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
         }
 
     @pytest.mark.asyncio
@@ -669,25 +689,42 @@ class TestGenerateResponseNode:
         # Create patches
         with (
             patch("app.rag.nodes.PromptManager") as mock_prompt_manager,
-            patch("app.rag.nodes.ChatOpenAI") as mock_chat_openai,
+            patch("app.rag.utils.ChatOpenAI") as mock_chat_openai,
             patch("app.rag.nodes.RunnableParallel") as mock_runnable_parallel,
             patch("app.rag.nodes.RunnableLambda") as mock_runnable_lambda,
             patch("app.rag.nodes.RunnablePassthrough") as mock_runnable_passthrough,
+            patch(
+                "app.rag.nodes.generate_with_fallback", new_callable=AsyncMock
+            ) as mock_generate_with_fallback,
         ):
 
-            # Configure mock prompt
+            # Configure generate_with_fallback to return our expected response
+            mock_generate_with_fallback.return_value = expected_response
+
+            # Configure mock prompt with AsyncMock for awaitable methods
             mock_prompt = MagicMock()
+            mock_prompt.ainvoke = AsyncMock(return_value={"content": "Mocked prompt response"})
             mock_prompt_manager.get_investment_prompt.return_value = mock_prompt
 
             # Configure mock model
             mock_model = MagicMock()
             mock_chat_openai.return_value = mock_model
 
-            # Configure mock chain
+            # Configure mock chain with AsyncMock for awaitable methods
             mock_chain = MagicMock()
+            mock_chain.ainvoke = AsyncMock(return_value={"content": "Chain response"})
             mock_runnable_parallel.return_value = mock_chain
             mock_chain.__or__.return_value = mock_chain
-            mock_chain.ainvoke = AsyncMock(return_value=expected_response)
+
+            # Mock RunnableLambda for context extraction
+            mock_context = MagicMock()
+            mock_context.ainvoke = AsyncMock(return_value="Extracted context")
+            mock_runnable_lambda.return_value = mock_context
+
+            # Mock RunnablePassthrough
+            mock_passthrough = MagicMock()
+            mock_passthrough.ainvoke = AsyncMock(return_value="Question passthrough")
+            mock_runnable_passthrough.return_value = mock_passthrough
 
             # Call the function
             result = await generate_response_node(mock_state)
@@ -703,8 +740,8 @@ class TestGenerateResponseNode:
             # Verify the correct prompt was selected
             mock_prompt_manager.get_investment_prompt.assert_called_once()
 
-            # Verify model was created with correct parameters
-            mock_chat_openai.assert_called_once_with(model="gpt-4o", temperature=0.0)
+            # Verify generate_with_fallback was called
+            mock_generate_with_fallback.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_response_technical(self, mock_state):
@@ -723,23 +760,32 @@ class TestGenerateResponseNode:
         # Create patches
         with (
             patch("app.rag.nodes.PromptManager") as mock_prompt_manager,
-            patch("app.rag.nodes.ChatOpenAI") as mock_chat_openai,
+            patch("app.rag.utils.ChatOpenAI") as mock_chat_openai,
             patch("app.rag.nodes.RunnableParallel") as mock_runnable_parallel,
+            patch(
+                "app.rag.nodes.generate_with_fallback", new_callable=AsyncMock
+            ) as mock_generate_with_fallback,
         ):
 
-            # Configure mock prompt
+            # Configure generate_with_fallback to return our expected response
+            mock_generate_with_fallback.return_value = expected_response
+
+            # Configure mock prompt with AsyncMock for awaitable methods
             mock_prompt = MagicMock()
+            mock_prompt.ainvoke = AsyncMock(
+                return_value={"content": "Mocked technical prompt response"}
+            )
             mock_prompt_manager.get_technical_analysis_prompt.return_value = mock_prompt
 
             # Configure mock model
             mock_model = MagicMock()
             mock_chat_openai.return_value = mock_model
 
-            # Configure mock chain
+            # Configure mock chain with AsyncMock for awaitable methods
             mock_chain = MagicMock()
+            mock_chain.ainvoke = AsyncMock(return_value={"content": "Technical chain response"})
             mock_runnable_parallel.return_value = mock_chain
             mock_chain.__or__.return_value = mock_chain
-            mock_chain.ainvoke = AsyncMock(return_value=expected_response)
 
             # Call the function
             result = await generate_response_node(mock_state)
@@ -749,6 +795,9 @@ class TestGenerateResponseNode:
 
             # Verify the correct prompt was selected
             mock_prompt_manager.get_technical_analysis_prompt.assert_called_once()
+
+            # Verify generate_with_fallback was called
+            mock_generate_with_fallback.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_response_no_docs(self, mock_state):
@@ -790,6 +839,8 @@ class TestGenerateAlternativeNode:
                 "k": 15,
                 "oversample_factor": 3,
             },
+            "generate_alternative_viewpoint": True,
+            "model": "gpt-4o",
         }
 
     @pytest.mark.asyncio
@@ -798,39 +849,30 @@ class TestGenerateAlternativeNode:
         # Prepare expected alternative
         expected_alternative = "AAPL's current price may be overvalued."
 
-        # Create patches
-        with (
-            patch("app.rag.nodes.PromptManager") as mock_prompt_manager,
-            patch("app.rag.nodes.ChatOpenAI") as mock_chat_openai,
-            patch("app.rag.nodes.RunnableParallel") as mock_runnable_parallel,
-        ):
-
-            # Configure mock prompt
+        # Create a simpler test using patch.object for just what we need
+        with patch.object(PromptManager, "get_investment_prompt") as mock_get_prompt:
+            # Setup mocks
             mock_prompt = MagicMock()
-            mock_prompt_manager.get_investment_prompt.return_value = mock_prompt
+            mock_get_prompt.return_value = mock_prompt
 
-            # Configure mock model
-            mock_model = MagicMock()
-            mock_chat_openai.return_value = mock_model
+            # Mock the generate_with_fallback function
+            async def mock_generate_func(*args, **kwargs):
+                return expected_alternative
 
-            # Configure mock chain
-            mock_chain = MagicMock()
-            mock_runnable_parallel.return_value = mock_chain
-            mock_chain.__or__.return_value = mock_chain
-            mock_chain.ainvoke = AsyncMock(return_value=expected_alternative)
-
-            # Call the function
-            result = await generate_alternative_node(mock_state)
+            with patch("app.rag.nodes.generate_with_fallback", mock_generate_func):
+                # We also need to mock inputs.ainvoke and prompt_template.ainvoke
+                with patch(
+                    "langchain_core.runnables.RunnableParallel.ainvoke", new_callable=AsyncMock
+                ) as mock_inputs_invoke:
+                    with patch.object(
+                        mock_prompt, "ainvoke", new_callable=AsyncMock
+                    ) as mock_prompt_invoke:
+                        # Call the function
+                        result = await generate_alternative_node(mock_state)
 
             # Assertions
-            assert "alternative_viewpoints" in result
             assert result["alternative_viewpoints"] == expected_alternative
-
-            # Verify the correct prompt was selected
-            mock_prompt_manager.get_investment_prompt.assert_called_once()
-
-            # Verify model was created with correct parameters - higher temperature
-            mock_chat_openai.assert_called_once_with(model="gpt-4o", temperature=0.7)
+            mock_get_prompt.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_alternative_general(self, mock_state):
@@ -855,8 +897,9 @@ class TestGenerateAlternativeNode:
         # Create patches
         with (
             patch("app.rag.nodes.PromptManager") as mock_prompt_manager,
-            patch("app.rag.nodes.ChatOpenAI") as mock_chat_openai,
-            patch("app.rag.nodes.RunnableParallel") as mock_runnable_parallel,
+            patch("app.rag.utils.ChatOpenAI") as mock_chat_openai,
+            patch("langchain_core.runnables.RunnableParallel") as mock_runnable_parallel,
+            patch("app.rag.nodes.generate_with_fallback", new_callable=AsyncMock) as mock_generate,
         ):
 
             # Configure mock prompt
@@ -867,14 +910,73 @@ class TestGenerateAlternativeNode:
             mock_model = MagicMock()
             mock_chat_openai.return_value = mock_model
 
-            # Configure mock chain to raise an exception
-            mock_chain = MagicMock()
-            mock_runnable_parallel.return_value = mock_chain
-            mock_chain.__or__.return_value = mock_chain
-            mock_chain.ainvoke = AsyncMock(side_effect=Exception("API error"))
+            # Configure mock to raise an exception
+            mock_generate.side_effect = Exception("API error")
 
             # Call the function
             result = await generate_alternative_node(mock_state)
 
             # Assertions
             assert result["alternative_viewpoints"] is None  # Should be None on error
+
+    @pytest.mark.asyncio
+    async def test_generate_alternative_respects_flag(self, mock_state):
+        """Test that alternative viewpoint generation respects the generate_alternative_viewpoint flag."""
+        # Prepare expected alternative
+        expected_alternative = "AAPL's current price may be overvalued."
+
+        # Import needed for deep copying
+        import copy
+
+        # Create a mock implementation for generate_with_fallback
+        async def mock_generate_func(*args, **kwargs):
+            return expected_alternative
+
+        # Create patches for all necessary components
+        with (
+            patch("app.rag.nodes.generate_with_fallback", mock_generate_func),
+            patch.object(PromptManager, "get_investment_prompt") as mock_get_prompt,
+            patch(
+                "langchain_core.runnables.RunnableParallel.ainvoke", new_callable=AsyncMock
+            ) as mock_parallel_invoke,
+            patch("langchain_core.output_parsers.StrOutputParser.parse") as mock_parse,
+        ):
+
+            # Setup mocks
+            mock_prompt = MagicMock()
+            mock_get_prompt.return_value = mock_prompt
+            mock_prompt.ainvoke = AsyncMock(return_value={"content": "Mocked prompt"})
+            mock_parallel_invoke.return_value = {
+                "context": "test context",
+                "question": "test question",
+            }
+            mock_parse.return_value = expected_alternative
+
+            # First test: with flag set to True
+            state1 = copy.deepcopy(mock_state)  # Make a fresh deep copy
+            state1["alternative_viewpoints"] = None  # Reset any previous state
+            state1["generate_alternative_viewpoint"] = True
+
+            # Run the test with the flag enabled
+            result1 = await generate_alternative_node(state1)
+
+            # Assertions - should generate alternative viewpoint when flag is True
+            assert result1["alternative_viewpoints"] == expected_alternative
+            assert mock_get_prompt.call_count > 0  # Should have been called at least once
+
+            # Reset the mocks for the second test
+            mock_get_prompt.reset_mock()
+            mock_prompt.ainvoke.reset_mock()
+            mock_parallel_invoke.reset_mock()
+
+            # Second test: with flag set to False - use a completely fresh state
+            state2 = copy.deepcopy(mock_state)  # Make another fresh deep copy
+            state2["alternative_viewpoints"] = None  # Reset alternative_viewpoints
+            state2["generate_alternative_viewpoint"] = False
+
+            # Run the test with the flag disabled
+            result2 = await generate_alternative_node(state2)
+
+            # Assertions - should NOT generate alternative viewpoint when flag is False
+            assert result2["alternative_viewpoints"] is None
+            assert mock_get_prompt.call_count == 0  # Should not have been called

@@ -38,6 +38,8 @@ class Settings(BaseSettings):
         environment (str): Deployment environment (development, staging, production)
         sentry_dsn (str, optional): Sentry DSN for error tracking
         model_name (str): Name of the OpenAI model to use
+        allowed_models (List[str]): List of allowed OpenAI models that can be used
+        default_model (str): Default model to use if none specified
         log_level (str): Logging verbosity level
         mocks_dir_name (str): Directory name for mock data storage
         cors_origins (List[str]): List of allowed origins for CORS
@@ -48,6 +50,16 @@ class Settings(BaseSettings):
     environment: str = Field("development", alias="ENVIRONMENT")
     sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
     model_name: str = Field("gpt-4o", alias="MODEL_NAME")
+    allowed_models: List[str] = Field(
+        default=[
+            "gpt-3.5-turbo",
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-4o",
+        ],
+        alias="ALLOWED_MODELS",
+    )
+    default_model: str = Field("gpt-3.5-turbo", alias="DEFAULT_MODEL")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     mocks_dir_name: str = Field("data", alias="MOCKS_DIR_NAME")
     cors_origins: List[str] = Field(

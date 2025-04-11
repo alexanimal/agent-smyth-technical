@@ -18,7 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 # Use relative imports for modules within src
 from .config import settings, setup_logging_and_sentry
-from .middleware import log_requests
+from .middleware import add_exception_handlers, log_requests
 from .routers import chat_router, status_router
 from .services import initialize_services
 
@@ -63,6 +63,7 @@ app = FastAPI(
     * Real-time chat processing using LLM
     * Source attribution from Twitter data
     * Query classification for specialized responses
+    * Model selection for generation
 
     ## Authentication
     Production environments require API key authentication via the `X-API-Key` header.
@@ -77,6 +78,9 @@ app = FastAPI(
     ],
     lifespan=lifespan,
 )
+
+# Register custom exception handlers
+add_exception_handlers(app)
 
 # Add Middleware
 # Note: Order matters. CORS should generally be early.

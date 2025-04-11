@@ -8,21 +8,54 @@ RAG pipeline, from query classification to response generation.
 
 import json
 import logging
+import time
 from operator import itemgetter
 from typing import Any, Dict, List
 
 from langchain_core.documents import Document
+from langchain_core.messages import AIMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnablePassthrough
-from langchain_openai import ChatOpenAI
 
+from app.config import settings
 from app.prompts import PromptManager
 from app.rag.scoring import diversify_ranked_documents, score_documents_with_social_metrics
 from app.rag.state import RAGState
+from app.rag.utils import generate_with_fallback, get_cached_llm
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+def ensure_string_content(message_or_string: Any) -> Any:
+    """
+    Ensures that message objects are converted to their string content.
+
+    This utility function handles conversion of AIMessage and other LangChain message objects
+    to strings, while leaving other types unchanged.
+
+    Args:
+        message_or_string: An input that might be a message object or something else
+
+    Returns:
+        The string content if input is a message object, otherwise the original input
+    """
+    # Check if it's a message object with content attribute
+    if hasattr(message_or_string, "content"):
+        logger.debug(f"Converting message object to string: {type(message_or_string)}")
+        return message_or_string.content
+
+    # Return dictionaries and lists as is
+    if isinstance(message_or_string, (dict, list)):
+        return message_or_string
+
+    # For everything else, ensure it's a string
+    if message_or_string is not None and not isinstance(message_or_string, str):
+        logger.debug(f"Converting {type(message_or_string)} to string")
+        return str(message_or_string)
+
+    return message_or_string
 
 
 async def classify_query_node(state: RAGState) -> RAGState:
@@ -40,18 +73,27 @@ async def classify_query_node(state: RAGState) -> RAGState:
     """
     query = state["query"]
 
-    # Create classifier model - could be moved to a singleton/factory
-    classifier_model = ChatOpenAI(model="gpt-4o", temperature=0.0)
+    # Get model from state or use default for classification
+    # For classification, we default to a fast model like gpt-4o even if a different model
+    # is selected for content generation
+    model_name = state.get("model", settings.default_model)
+    logger.info(f"Classifying query using model: {model_name}")
 
-    # Get classification prompt
+    start_time = time.time()
+
+    # Create classification prompt
     classification_prompt = PromptManager.get_classification_prompt()
 
-    # Create classification chain
-    chain = classification_prompt | classifier_model | StrOutputParser()
-
     try:
+        # Get classification result using cached model
+        classifier_model = get_cached_llm(model_name, temperature=0.0)
+        chain = classification_prompt | classifier_model | StrOutputParser()
+
         # Get classification result
         classification_result = await chain.ainvoke({"query": query})
+
+        classification_time = time.time() - start_time
+        logger.info(f"Query classified in {classification_time:.2f}s using {model_name}")
 
         # Parse JSON result with confidence scores
         confidence_scores = json.loads(classification_result.strip())
@@ -81,6 +123,8 @@ async def classify_query_node(state: RAGState) -> RAGState:
             "query_type": max_category,
             "confidence_scores": confidence_scores,
             "is_mixed": is_mixed,
+            "classification_time": classification_time,
+            "model_used": model_name,
         }
 
     except Exception as e:
@@ -95,6 +139,8 @@ async def classify_query_node(state: RAGState) -> RAGState:
                 "general": 100,
             },
             "is_mixed": False,
+            "error": str(e),
+            "model_used": model_name,
         }
 
     return state
@@ -269,9 +315,20 @@ async def generate_response_node(state: RAGState) -> RAGState:
     docs = state["ranked_docs"]
     classification = state["classification"]
 
+    # Get model name from state
+    model_name = state.get("model", settings.default_model)
+    logger.info(f"Generating response using model: {model_name}")
+
+    start_time = time.time()
+
     if not docs:
         state["response"] = "I couldn't find any relevant information."
         state["sources"] = []
+        state["generation_metrics"] = {
+            "model": model_name,
+            "generation_time": 0,
+            "document_count": 0,
+        }
         return state
 
     # Extract document content and build context string
@@ -294,30 +351,78 @@ async def generate_response_node(state: RAGState) -> RAGState:
     }
     prompt_template = prompt_templates.get(query_type, PromptManager.get_general_prompt())
 
-    # Choose the appropriate model
-    model = ChatOpenAI(model="gpt-4o", temperature=0.0)
-    if query_type in ["trading_thesis", "technical"]:
-        model = ChatOpenAI(model="gpt-4o", temperature=0.0)  # Lower temp for technical
-
-    # Build and run the chain
+    # Build inputs for the prompt
     inputs = RunnableParallel(
         context=RunnableLambda(lambda x: context_string),
         question=RunnablePassthrough(),
     )
-    chain = inputs | prompt_template | model | StrOutputParser()
 
-    # Generate response
-    response = await chain.ainvoke(query)
+    try:
+        # Use generate_with_fallback for robust generation with retries
+        prompt_inputs = await inputs.ainvoke(query)
+        prompt_messages = await prompt_template.ainvoke(prompt_inputs)
 
-    # Extract sources
-    sources = []
-    for doc in docs:
-        if doc.metadata and "url" in doc.metadata and doc.metadata["url"]:
-            sources.append(doc.metadata["url"])
+        # Adjust temperature based on query type
+        temperature = 0.0
+        if query_type == "general":
+            temperature = 0.2  # Slightly higher for general queries
 
-    # Update state
-    state["response"] = response
-    state["sources"] = list(set(sources))  # Deduplicate sources
+        # Use our utility for generation with fallback
+        response = await generate_with_fallback(
+            prompt=prompt_messages,
+            model_name=model_name or settings.default_model,
+            fallback_model="gpt-3.5-turbo",  # Fallback to a simpler model if needed
+            temperature=temperature,
+        )
+
+        # Ensure the response is properly converted to a string
+        parsed_response = StrOutputParser().parse(response)
+
+        # Double-check that parsed_response is a string (handle AIMessage objects)
+        # This is critical for calculating length and other string operations
+        parsed_response = ensure_string_content(parsed_response)
+
+        generation_time = time.time() - start_time
+        logger.info(f"Response generated in {generation_time:.2f}s using {model_name}")
+
+        # Extract sources
+        sources = []
+        for doc in docs:
+            if doc.metadata and "url" in doc.metadata and doc.metadata["url"]:
+                sources.append(doc.metadata["url"])
+
+        # Safely get the content length
+        try:
+            response_length = len(parsed_response)
+        except (TypeError, AttributeError):
+            logger.warning(f"Could not determine length of response, using fallback length of 0")
+            response_length = 0
+
+        # Record metrics for monitoring and tracking
+        generation_metrics = {
+            "model": model_name,
+            "generation_time": generation_time,
+            "document_count": len(docs),
+            "context_length": len(context_string),
+            "response_length": response_length,
+        }
+
+        # Update state
+        state["response"] = parsed_response
+        state["sources"] = list(set(sources))  # Deduplicate sources
+        state["generation_metrics"] = generation_metrics
+
+    except Exception as e:
+        logger.error(f"Error generating response: {str(e)}", exc_info=True)
+        state["response"] = (
+            "I'm sorry, I encountered an error while generating a response. Please try again."
+        )
+        state["sources"] = []
+        state["generation_metrics"] = {
+            "model": model_name,
+            "error": str(e),
+            "document_count": len(docs),
+        }
 
     return state
 
@@ -328,6 +433,7 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
 
     This node generates alternative perspectives or counterarguments for
     specific query types to provide a more balanced response to the user.
+    The generation only happens if explicitly requested via the generate_alternative_viewpoint flag.
 
     Args:
         state: The current workflow state
@@ -335,9 +441,19 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
     Returns:
         Updated workflow state with alternative viewpoints
     """
+    # Check if alternative viewpoints are requested
+    generate_alternative = state.get("generate_alternative_viewpoint", False)
+
+    if not generate_alternative:
+        logger.info("Alternative viewpoint generation skipped (not requested)")
+        return state
+
     query = state["query"]
     docs = state["ranked_docs"]
     classification = state["classification"]
+
+    # Get model name from state
+    model_name = state.get("model", settings.default_model)
 
     # Only process for certain query types that aren't mixed
     query_type = classification["query_type"]
@@ -345,6 +461,9 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
 
     if query_type in ["investment", "trading_thesis", "technical"] and not is_mixed:
         try:
+            logger.info(f"Generating alternative viewpoint using model: {model_name}")
+            start_time = time.time()
+
             # Build context string
             context_string = "\n\n---\n\n".join([doc.page_content for doc in docs])
 
@@ -358,31 +477,49 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
             if prompt_template_getter:
                 prompt_template = prompt_template_getter()
 
-                # Use higher temperature model for alternatives
-                explorer_model = ChatOpenAI(
-                    model="gpt-4o", temperature=0.7
-                )  # Higher temp for creativity
-
-                # Build chain
+                # Build inputs for the prompt
                 inputs = RunnableParallel(
                     context=RunnableLambda(lambda x: context_string),
                     question=RunnablePassthrough(),
                 )
-                counter_chain = inputs | prompt_template | explorer_model | StrOutputParser()
 
-                # Generate alternative
+                # Use a higher temperature for alternative viewpoints
                 counter_prompt = (
                     f"Generate an alternative perspective or counter-argument to: {query}"
                 )
-                alternative_viewpoints = await counter_chain.ainvoke(counter_prompt)
+
+                prompt_inputs = await inputs.ainvoke(counter_prompt)
+                prompt_messages = await prompt_template.ainvoke(prompt_inputs)
+
+                # Use a higher temperature for exploring alternatives
+                alternative_response = await generate_with_fallback(
+                    prompt=prompt_messages,
+                    model_name=model_name,
+                    fallback_model="gpt-3.5-turbo",
+                    temperature=0.7,  # Higher temperature for more creative alternatives
+                )
+
+                # Ensure the alternative viewpoint is properly converted to a string
+                alternative_viewpoints = StrOutputParser().parse(alternative_response)
+                alternative_viewpoints = ensure_string_content(alternative_viewpoints)
+
+                generation_time = time.time() - start_time
+                logger.info(
+                    f"Alternative viewpoint generated in {generation_time:.2f}s using {model_name}"
+                )
 
                 # Update state
                 state["alternative_viewpoints"] = alternative_viewpoints
+
+                if "generation_metrics" in state:
+                    state["generation_metrics"]["alternative_time"] = generation_time
             else:
                 logger.warning(f"No prompt template found for query type: {query_type}")
 
         except Exception as e:
             logger.warning(f"Failed to generate alternative viewpoints: {str(e)}")
-            # No need to set alternative_viewpoints to None, it's either populated or not in the state
+            # Record the error but don't fail the whole process
+            if "generation_metrics" in state:
+                state["generation_metrics"]["alternative_error"] = str(e)
 
     return state

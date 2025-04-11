@@ -92,7 +92,7 @@ def test_chat_endpoint(setup_mocks):
     response = client.post(
         "/chat",
         headers={"User-Agent": "pytest-client", "X-API-Key": TEST_API_KEY},  # Add API key header
-        json={"message": "Test message", "num_results": 3},
+        json={"message": "Test message", "num_results": 3, "generate_alternative_viewpoint": False},
     )
 
     # Check response
@@ -110,8 +110,15 @@ def test_chat_endpoint(setup_mocks):
     assert "metadata" in response_data  # Check metadata structure if needed
 
     # Verify the mock handler in app_state was called correctly
+    from unittest.mock import ANY
+
     setup_mocks.process_query.assert_called_once_with(
-        message="Test message", k=3, ranking_weights=None
+        message="Test message",
+        k=3,
+        ranking_weights=None,
+        model=ANY,
+        context=ANY,
+        generate_alternative_viewpoint=False,
     )
 
 

@@ -338,7 +338,7 @@ class TestChatHandler:
             # Assert - LLM should now be initialized
             assert handler._llm is not None
             # Verify the model name and temperature were passed correctly
-            mock_chat_openai.assert_called_once_with(model="test-model", temperature=0)
+            mock_chat_openai.assert_called_once_with(model_name="test-model", temperature=0)
 
     def test_router_lazy_loading(self):
         """Test that router is lazily loaded."""
@@ -552,7 +552,7 @@ class TestChatHandler:
             assert handler._technical_llm is not None
             # Verify the model name and reduced temperature were passed correctly
             mock_chat_openai.assert_called_once_with(
-                model="test-model", temperature=0.3
+                model_name="test-model", temperature=0.3
             )  # 0.5 - 0.2 = 0.3
 
     @pytest.mark.asyncio
