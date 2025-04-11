@@ -1,18 +1,27 @@
-
 import './App.css'
 import { Suspense } from 'react'
 import ChatContainer from './components/ChatContainer'
+
+/**
+ * Root App component that wraps the chat application
+ * Uses Suspense for better loading experience
+ */
 function App() {
-  
-  // Fix: prefetch and preconnect are not callable functions from react-dom
-  // They should be used as resource hints in the document head
-  
   return (
-    <>
-      <Suspense fallback={<div>Loading...</div>}>
+    <div className="h-screen w-screen">
+      <Suspense fallback={
+        <div className="flex h-screen w-screen items-center justify-center">
+          <div className="text-center">
+            <div className="mb-4 text-2xl font-semibold">Loading Chat...</div>
+            <div className="h-2 w-40 mx-auto rounded-full bg-gray-200 overflow-hidden">
+              <div className="h-full bg-blue-500 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      }>
         <ChatContainer />
       </Suspense>
-    </>
+    </div>
   )
 }
 

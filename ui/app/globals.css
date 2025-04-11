@@ -1,3 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Add animation utility classes */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .animate-pulse {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+}
+
+/* Enhanced message styling */
+.message-container {
+  max-width: 85%;
+}
+
+/* Markdown content styling */
+.markdown-content p {
+  text-align: justify;
+}
+
+.markdown-content li p {
+  text-align: justify;
+}
+
+.markdown-content blockquote p {
+  text-align: justify;
+}
+
+@media (min-width: 768px) {
+  .message-container {
+    max-width: 80%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .message-container {
+    max-width: 80%;
+  }
+
+  /* Improve readability for long text content */
+  .markdown-content {
+    line-height: 1.6;
+    font-size: 0.95rem;
+  }
+
+  /* Ensure code blocks have proper spacing and readability */
+  .markdown-content pre {
+    margin: 1rem 0;
+    border-radius: 0.5rem;
+  }
+}
+
+/* Add specific styling to improve readability for large content blocks */
+.message-content-large {
+  max-width: 80ch; /* Optimal reading width */
+  margin: 0 auto;
+}
+
+/* Improve readability with text justification for large content */
+.text-justify {
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* Ensure proper spacing between justified paragraphs */
+.text-justify p {
+  margin-bottom: 0.75em;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: #2e2e2e;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #555;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+/* Better input styling for range inputs */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.dark input[type="range"] {
+  background: #4b5563;
+}
+
+/* Remove textarea resize handle */
+textarea {
+  resize: none;
+}
+
+/* Fix for mobile viewport height issues */
+@supports (-webkit-touch-callout: none) {
+  .h-screen {
+    height: -webkit-fill-available;
+  }
+}
+
+/* Ensure code blocks don't overflow containers */
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Improve the display of code in message containers */
+.code-block-wrapper {
+  position: relative;
+  margin: 1rem 0;
+}
+
+.code-block-toolbar {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.copy-button {
+  background: rgba(0,0,0,0.3);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.copy-button:hover {
+  background: rgba(0,0,0,0.5);
+}
+
 /* Add these slider styles to the end of the file */
 
 /* Slider styles */

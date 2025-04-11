@@ -1,50 +1,65 @@
 'use client';
 
-import { useSelector } from 'react-redux';
-import { useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
+import { MessageList } from './MessageList'
+import { InputArea } from './InputArea'
+import { SettingsPanel } from './settings/SettingsPanel'
+import { useChatStore } from '../store/chatStore'
+import { useSettingsStore } from '../store/settingsStore'
 
-import MessageContainer from './MessageContainer';
-import { RootState } from '../store/store';
-import InputContainer from './InputContainer';
-import Loader from './Loader';
+/**
+ * Main container component for the chat application
+ * Manages layout and user interface state
+ */
+const ChatContainer: React.FC = () => {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const clearMessages = useChatStore(state => state.clearMessages)
+  const currentModel = useSettingsStore(state => state.model)
+  const currentApiType = useSettingsStore(state => state.apiType)
 
-// Define an interface for the chat message structure
-interface ChatMessage {
-  id: string | number; // Or the actual type of your ID
-  message: string;
-  isUser: boolean;
-  createdAt: string;
+  // Set the document title to include the current model
+  useEffect(() => {
+    document.title = `Chat with ${currentModel}`
+  }, [currentModel])
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-950" data-testid="chat-container">
+      <header className="bg-white dark:bg-gray-900 dark:text-white border-b dark:border-gray-700 p-4 flex justify-between items-center">
+        <div className="flex items-center">
+          <h1 className="text-xl font-bold">Chat Application</h1>
+          <div className="ml-3 text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+            {currentApiType === 'stream' ? 'Streaming' : 'Regular'} · {currentModel}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => clearMessages()}
+            className="px-3 py-1 text-sm border rounded hover:bg-gray-100 dark:hover:bg-gray-800 dark:border-gray-700 dark:text-gray-200 transition-colors"
+            aria-label="Clear chat history"
+            data-testid="clear-button"
+          >
+            Clear Chat
+          </button>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="px-3 py-1 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+            aria-label="Open settings"
+            data-testid="settings-button"
+          >
+            Settings
+          </button>
+        </div>
+      </header>
+
+      <MessageList />
+      <InputArea />
+
+      <SettingsPanel
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+    </div>
+  )
 }
 
-export default function ChatContainer() {
-    const chats = useSelector((state: RootState) => state.messages);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-    
-    useEffect(() => {
-        scrollToBottom();
-    }, [chats.messages]);
-
-    return (
-        <main className="chat-container flex flex-col h-screen" >
-            <div className="chat-container-messages flex overflow-y-auto scrollbar-none p-4">
-                <div className="chat-container-messages-content flex flex-col gap-6 w-full max-w-full mx-auto mt-auto">
-                    {chats.messages.map((m: ChatMessage) => (
-                        <MessageContainer 
-                            key={m.id} 
-                            message={m.message} 
-                            isUser={m.isUser} 
-                            createdAt={m.createdAt} 
-                        />
-                    ))}
-                    <div ref={messagesEndRef} />
-                    <Loader />
-                </div>
-            </div>
-            <InputContainer />
-        </main>
-    )
-}
+export default ChatContainer
