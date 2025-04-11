@@ -21,7 +21,7 @@ export const sendMessage = async ({
   const requestBody = {
     message,
     model: settings.model,
-    generate_alternative_opinions: settings.generateAlternativeOpinions,
+    generate_alternative_viewpoint: settings.generateAlternativeOpinions,
     num_results: settings.numRecords || 50 // Default to 50 if not set
   }
 

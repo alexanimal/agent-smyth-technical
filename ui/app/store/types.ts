@@ -3,6 +3,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: number;
+  sources?: string[];
+  alternativeViewpoint?: string | null;
 }
 
 export interface ChatStore {

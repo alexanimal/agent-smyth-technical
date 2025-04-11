@@ -107,7 +107,9 @@ export const useChat = () => {
             role: 'assistant',
             content: data.response || data.content || 'No content received',
             id: uuidv4(),
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            sources: data.sources || [],
+            alternativeViewpoint: data.alternative_viewpoints || null
           })
         } catch (jsonError) {
           console.error('Error parsing JSON response:', jsonError)

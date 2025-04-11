@@ -4,12 +4,15 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import Avatar from './Avatar'
 import useCopyToClipboard from '../hooks/useCopyToClipboard'
+import MessageWithViewpoints from './MessageWithViewpoints'
 
 interface MessageItemProps {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: number
   isStreaming?: boolean
+  sources?: string[]
+  alternativeViewpoint?: string | null
 }
 
 // Interface for code component props in ReactMarkdown
@@ -22,13 +25,16 @@ interface CodeProps {
 
 /**
  * Component to display a single message with appropriate styling
- * Includes support for markdown formatting and code syntax highlighting
+ * Includes support for markdown formatting, code syntax highlighting,
+ * and optionally sources and alternative viewpoints for assistant messages
  */
 export const MessageItem: React.FC<MessageItemProps> = ({
   role,
   content,
   timestamp,
-  isStreaming = false
+  isStreaming = false,
+  sources = [],
+  alternativeViewpoint = null
 }) => {
   const [isCopied, copyToClipboard] = useCopyToClipboard();
 
@@ -44,6 +50,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   // Determine if this is a system message (error, notification, etc.)
   const isSystemMessage = role === 'system';
 
+  // For system messages (errors, notifications)
   if (isSystemMessage) {
     return (
       <div className="flex justify-center my-4 animate-fade-in">
@@ -54,7 +61,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
-  // User message styling
+  // For user messages
   if (role === 'user') {
     return (
       <div className="flex flex-col items-end mb-4 animate-fade-in">
@@ -72,7 +79,20 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
-  // Assistant message with markdown support - expanded to 80% width
+  // For assistant messages - use MessageWithViewpoints if we have sources or alternativeViewpoint
+  if ((sources && sources.length > 0) || alternativeViewpoint) {
+    return (
+      <MessageWithViewpoints
+        content={content}
+        sources={sources || []}
+        alternativeViewpoint={alternativeViewpoint}
+        timestamp={timestamp}
+        isStreaming={isStreaming}
+      />
+    );
+  }
+
+  // Standard assistant message with markdown support - no sources or alternatives
   return (
     <div className={`flex mb-4 ${isStreaming ? 'animate-pulse' : 'animate-fade-in'}`}>
       <Avatar />
@@ -159,3 +179,5 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     </div>
   );
 };
+
+export default MessageItem;

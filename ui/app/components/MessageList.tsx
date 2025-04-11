@@ -54,6 +54,8 @@ export const MessageList: React.FC = () => {
             role={message.role}
             content={message.content}
             timestamp={message.timestamp}
+            sources={message.sources || []}
+            alternativeViewpoint={message.alternativeViewpoint || null}
           />
         ))}
 
@@ -63,6 +65,8 @@ export const MessageList: React.FC = () => {
             role="assistant"
             content={streamingMessage}
             isStreaming={true}
+            sources={[]} // No sources during streaming
+            alternativeViewpoint={null} // No alternative during streaming
           />
         )}
       </div>
@@ -75,3 +79,5 @@ export const MessageList: React.FC = () => {
     </div>
   )
 }
+
+export default MessageList
