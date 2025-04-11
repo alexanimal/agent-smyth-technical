@@ -339,3 +339,171 @@ input[type="range"]:hover::-moz-range-thumb {
 input[type="range"]:active::-moz-range-thumb {
   transform: scale(1.15);
 }
+
+/* Custom Animations for Chat Interface */
+@keyframes avatar-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bouncing-dot {
+  0%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+}
+
+/* New animation for smooth content transitions */
+@keyframes content-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-avatar-pulse {
+  animation: avatar-pulse 2s infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-bouncing-dot {
+  animation: bouncing-dot 1.4s infinite ease-in-out both;
+}
+
+.animate-content-appear {
+  animation: content-appear 0.5s ease-out forwards;
+}
+
+/* Message Content Styling */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.markdown-content p {
+  margin-bottom: 1em;
+  line-height: 1.6;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.markdown-content a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 1em;
+  color: #6b7280;
+  font-style: italic;
+  margin: 1em 0;
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  border-radius: 0.375rem;
+  background-color: #282a36;
+  padding: 1em;
+  margin: 1em 0;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  margin: 1em 0;
+}
+
+.markdown-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875em;
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  background-color: rgba(209, 213, 219, 0.2);
+}
+
+/* Dark mode adjustments */
+.dark .markdown-content code {
+  background-color: rgba(55, 65, 81, 0.5);
+}
+
+.dark .markdown-content blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+.message-content-large {
+  max-width: 100%;
+}
+
+/* Scrollbar styling */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.7);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.7);
+}

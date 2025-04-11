@@ -20,6 +20,8 @@ export const useChatStore = create<ChatStore>()(
           streamingMessage: content
         })),
 
+      getStreamingMessage: () => get().streamingMessage,
+
       finalizeStreamingMessage: () =>
         set((state) => {
           if (!state.streamingMessage) return state

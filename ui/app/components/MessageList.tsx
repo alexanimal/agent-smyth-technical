@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react'
 import { MessageItem } from './MessageItem'
 import { useChatStore } from '../store/chatStore'
+import { useChatWithMetadata } from '../hooks/useChatWithMetadata'
 
 /**
  * Component that renders a list of message items
@@ -8,6 +9,12 @@ import { useChatStore } from '../store/chatStore'
  */
 export const MessageList: React.FC = () => {
   const { messages, streamingMessage, isLoading } = useChatStore()
+  const {
+    streamingSources,
+    streamingAlternativeViewpoint,
+    isStreamComplete
+  } = useChatWithMetadata()
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -31,13 +38,26 @@ export const MessageList: React.FC = () => {
     }
   }
 
+  // Debug log for streaming messages and metadata
+  useEffect(() => {
+    if (streamingMessage) {
+      console.log('Streaming status in MessageList:', {
+        streamingContentLength: streamingMessage?.length || 0,
+        hasSources: Array.isArray(streamingSources) && streamingSources.length > 0,
+        sourcesCount: streamingSources?.length || 0,
+        hasAlternativeViewpoint: !!streamingAlternativeViewpoint,
+        isStreamComplete
+      });
+    }
+  }, [streamingMessage, streamingSources, streamingAlternativeViewpoint, isStreamComplete]);
+
   return (
     <div
       ref={listRef}
       className="flex flex-col p-4 space-y-4 overflow-y-auto h-full pb-6 scrollbar-thin"
     >
       {/* Welcome message if no messages yet */}
-      {messages.length === 0 && (
+      {messages.length === 0 && !streamingMessage && (
         <div className="text-center py-8 animate-fade-in">
           <h2 className="text-lg font-medium mb-2">Welcome to the Chat!</h2>
           <p className="text-gray-500 dark:text-gray-400">
@@ -65,8 +85,8 @@ export const MessageList: React.FC = () => {
             role="assistant"
             content={streamingMessage}
             isStreaming={true}
-            sources={[]} // No sources during streaming
-            alternativeViewpoint={null} // No alternative during streaming
+            sources={isStreamComplete ? streamingSources : []}
+            alternativeViewpoint={isStreamComplete ? streamingAlternativeViewpoint : null}
           />
         )}
       </div>

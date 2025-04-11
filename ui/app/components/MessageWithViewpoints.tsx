@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -38,8 +38,25 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
   const [showAlternative, setShowAlternative] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
-  const hasAlternative = alternativeViewpoint !== null;
+  // Check for valid sources and alternative viewpoint data
+  const hasValidSources = Array.isArray(sources) && sources.length > 0;
+  const hasAlternative = typeof alternativeViewpoint === 'string' && alternativeViewpoint.trim().length > 0;
+
+  // Current content to display based on toggle state
   const currentContent = showAlternative && hasAlternative ? alternativeViewpoint : content;
+
+  // Debug logs to track props changes
+  useEffect(() => {
+    console.log('MessageWithViewpoints props updated:', {
+      contentLength: content.length,
+      isStreaming,
+      hasSources: hasValidSources,
+      sourcesCount: sources?.length || 0,
+      hasAlternativeViewpoint: hasAlternative,
+      alternativeViewpointLength: alternativeViewpoint?.length || 0,
+      showingAlternative: showAlternative
+    });
+  }, [content, isStreaming, sources, alternativeViewpoint, showAlternative, hasValidSources, hasAlternative]);
 
   // Format timestamp if available
   const formattedTime = timestamp
@@ -57,18 +74,38 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  return (
-    <div className="message-with-viewpoints">
-      <ViewpointToggle
-        showAlternative={showAlternative}
-        onToggle={setShowAlternative}
-        hasAlternative={hasAlternative}
-      />
+  // Define streaming animation class
+  const streamingAnimationClass = isStreaming
+    ? 'border-l-4 border-blue-500 pl-3 animate-pulse-subtle'
+    : 'animate-fade-in';
 
-      <div className={`flex mb-4 ${isStreaming ? 'animate-pulse' : 'animate-fade-in'}`}>
-        <Avatar />
+  return (
+    <div className="message-with-viewpoints transition-all duration-300">
+      {/* Only show viewpoint toggle when we have a valid alternative viewpoint */}
+      {hasAlternative && (
+        <ViewpointToggle
+          showAlternative={showAlternative}
+          onToggle={setShowAlternative}
+          hasAlternative={hasAlternative}
+        />
+      )}
+
+      <div className={`flex mb-4 ${streamingAnimationClass}`}>
+        <Avatar isAnimated={isStreaming} />
         <div className="ml-3 flex flex-col w-full max-w-[80%] sm:max-w-[85%] md:max-w-[80%] lg:max-w-[80%]">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-md hover:shadow-lg transition-shadow duration-300 markdown-content message-content-large text-justify">
+          <div className={`bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-md hover:shadow-lg transition-shadow duration-300 markdown-content message-content-large text-justify`}>
+            {/* Streaming indicator */}
+            {isStreaming && (
+              <div className="flex items-center mb-2 text-blue-500 text-xs font-medium">
+                <div className="mr-2 flex space-x-1">
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bouncing-dot" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bouncing-dot" style={{ animationDelay: '300ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bouncing-dot" style={{ animationDelay: '600ms' }}></div>
+                </div>
+                <span>Generating response</span>
+              </div>
+            )}
+
             <ReactMarkdown
               components={{
                 code({ node, inline, className, children, ...props }: CodeProps) {
@@ -77,11 +114,12 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
 
                   if (!inline && match) {
                     return (
-                      <div className="code-block-wrapper">
-                        <div className="code-block-toolbar">
+                      <div className="code-block-wrapper relative rounded overflow-hidden my-3 bg-gray-900">
+                        <div className="code-block-header flex items-center justify-between px-4 py-2 bg-gray-800 text-gray-400 text-xs">
+                          <span>{match[1]}</span>
                           <button
                             onClick={() => copyToClipboard(codeContent)}
-                            className="copy-button"
+                            className="copy-button px-2 py-1 rounded hover:bg-gray-700 transition-colors duration-200"
                             aria-label="Copy code to clipboard"
                           >
                             {isCopied ? 'Copied!' : 'Copy'}
@@ -90,8 +128,9 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
                         <SyntaxHighlighter
                           language={match[1]}
                           style={dracula}
-                          PreTag="div"
-                          className="rounded my-2 overflow-hidden"
+                          customStyle={{ margin: 0, borderRadius: 0 }}
+                          showLineNumbers={codeContent.split('\n').length > 3}
+                          wrapLongLines={false}
                         >
                           {codeContent}
                         </SyntaxHighlighter>
@@ -100,20 +139,21 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
                   }
 
                   return (
-                    <code className={`${className} bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded`} {...props}>
+                    <code className={`${className} bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono text-sm`} {...props}>
                       {children}
                     </code>
                   );
                 },
                 // Enhance other markdown elements
-                p: ({ children }) => <p className="my-2 text-sm text-justify">{children}</p>,
-                h1: ({ children }) => <h1 className="text-xl font-bold my-3">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-lg font-bold my-2">{children}</h2>,
-                ul: ({ children }) => <ul className="list-disc pl-5 my-2">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal pl-5 my-2">{children}</ol>,
-                li: ({ children }) => <li className="my-1">{children}</li>,
+                p: ({ children }) => <p className="my-2 text-sm text-justify leading-relaxed">{children}</p>,
+                h1: ({ children }) => <h1 className="text-xl font-bold my-3 border-b pb-1 border-gray-200 dark:border-gray-700">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-lg font-bold my-2 text-gray-800 dark:text-gray-200">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-md font-semibold my-2 text-gray-800 dark:text-gray-200">{children}</h3>,
+                ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
+                li: ({ children }) => <li className="my-1 text-sm">{children}</li>,
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-gray-300 pl-3 italic my-2">{children}</blockquote>
+                  <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-3 italic my-3 text-gray-700 dark:text-gray-300">{children}</blockquote>
                 ),
                 // Add custom styling for tables
                 table: ({ children }) => (
@@ -144,11 +184,14 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
             </ReactMarkdown>
           </div>
 
-          {timestamp && (
+          {timestamp && !isStreaming && (
             <span className="text-xs text-gray-500 mt-1 ml-2">{formattedTime}</span>
           )}
 
-          <CollapsibleSources sources={sources} />
+          {/* Only show sources if we have valid sources */}
+          {hasValidSources && (
+            <CollapsibleSources sources={sources} />
+          )}
         </div>
       </div>
     </div>

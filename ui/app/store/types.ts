@@ -14,6 +14,7 @@ export interface ChatStore {
 
   addMessage: (message: ChatMessage) => void;
   setStreamingMessage: (content: string | null) => void;
+  getStreamingMessage: () => string | null;
   finalizeStreamingMessage: () => void;
   setLoading: (isLoading: boolean) => void;
   clearMessages: () => void;

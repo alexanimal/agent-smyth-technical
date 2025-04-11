@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import LoadingIndicator from './LoadingIndicator';
 import { useChatStore } from '../store/chatStore';
+import { useSettingsStore } from '../store/settingsStore';
+import { useChatWithMetadata } from '../hooks/useChatWithMetadata';
 
 /**
  * Main Chat component that combines all chat-related components
@@ -10,6 +12,21 @@ import { useChatStore } from '../store/chatStore';
  */
 const Chat: React.FC = () => {
   const { isLoading, clearMessages } = useChatStore();
+  const settings = useSettingsStore();
+  const { messages } = useChatWithMetadata();
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      // Slight delay to ensure content is rendered
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+  }, [messages]);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
@@ -41,7 +58,10 @@ const Chat: React.FC = () => {
       </header>
 
       {/* Message List - Flex grow to take available space */}
-      <div className="flex-1 overflow-hidden relative">
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto relative"
+      >
         <MessageList />
       </div>
 
