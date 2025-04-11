@@ -112,6 +112,18 @@ class PromptManager:
             3. If the information is not in the context, say "I don't have enough information to answer that question"
             4. Do not make up facts or reference sources not in the context
             5. If appropriate, mention how many tweets support your answer
+
+            FORMAT YOUR RESPONSE USING PROPER MARKDOWN:
+            - Format your answer using Markdown syntax for better readability
+            - Use **bold** for emphasis on important points
+            - Use _italics_ for secondary emphasis
+            - Use proper list formatting for enumerated points
+            - Use `code` formatting for specific metrics, numbers, or data points
+            - Use ```json code blocks with syntax highlighting for any structured data
+            - If you quote a tweet, use > blockquote formatting
+            - For any statistics or trends, consider using markdown tables
+
+            Make your response visually clear and well-structured for display in a React application.
             """,
                 ),
                 MessagesPlaceholder("chat_history", optional=True),
@@ -204,6 +216,17 @@ class PromptManager:
                - End with a balanced conclusion that presents both bullish and bearish perspectives
                - Express certainty levels for different aspects of your analysis (e.g., "High confidence: 80-90%")
 
+            IMPORTANT: Format your entire response using proper Markdown syntax for optimal readability:
+            - Use Markdown headings (# for main sections, ## for subsections, ### for sub-subsections)
+            - Format any code or JSON data in ```json code blocks with language specification
+            - Use proper Markdown formatting for ordered and unordered lists
+              * Use asterisks (*) or hyphens (-) for bullet points
+              * Ensure proper indentation for nested lists
+            - Use **bold** for emphasis of important points and key metrics
+            - Use _italic_ for secondary emphasis or explanations
+            - Format any data tables using proper Markdown table syntax
+            - For any numerical data or statistics, consider using `code` formatting
+
             Remember to maintain objectivity and interpret technical indicators within the context of the broader market environment.
             """,
                 ),
@@ -272,13 +295,17 @@ class PromptManager:
 
             For the given query, provide a JSON object with confidence scores (0-100) for each category.
             Your response should follow this exact format:
+            ```json
             {{"technical": X, "trading_thesis": Y, "investment": Z, "general": W}}
+            ```
 
             Where X, Y, Z, and W are numeric values from 0-100 representing your confidence that the query belongs to each category.
             The sum of all confidence scores should be 100.
 
             IMPORTANT: Analyze the full context of the query. A query may have elements of multiple categories.
             Assign confidence based on the main intent of the query, not just keyword matching.
+
+            Return ONLY the JSON object with no additional text.
             """,
                 ),
                 ("human", "{query}"),
@@ -371,18 +398,27 @@ class PromptManager:
                - Identify specific technical conditions that would invalidate the analysis
                - Quantify uncertainty in each element of your analysis
 
-            FORMAT YOUR RESPONSE:
-            - Begin with a concise summary of the overall technical outlook
-            - Structure your analysis in clearly labeled sections
-            - Use bullet points for clarity when appropriate
-            - Include a dedicated "Bias Mitigation" section
-            - Conclude with probabilistic recommendations rather than absolutes
-            - Only reference information contained in the provided context
-            - If critical technical data is missing, acknowledge the limitation
+            FORMAT YOUR RESPONSE USING PROPER MARKDOWN:
+            - Begin with a # Heading for the overall technical outlook
+            - Use ## headings for main sections and ### for subsections
+            - Format any numerical data in `code` style (e.g., `RSI: 78.5`)
+            - Use **bold text** for critical insights and key levels
+            - Format lists using proper markdown:
+              * Use asterisks or hyphens for unordered lists
+              * Use proper indentation for nested lists
+            - Create tables for comparing different scenarios using markdown table syntax:
+              ```
+              | Scenario | Probability | Target | Risk/Reward |
+              | -------- | ----------- | ------ | ----------- |
+              | Bullish  | 60%         | $125   | 1:3         |
+              ```
+            - For any metrics or calculations, use ```python code blocks with syntax highlighting
+            - Use > blockquotes for important warnings or caveats
 
-            Remember that precision is crucial - provide specific price levels, indicator readings,
-            and timeframes whenever possible rather than general statements. Express certainty levels
-            for different aspects of your analysis (e.g., "High confidence: 80-90%").
+            Ensure precision with specific price levels, indicator readings, and timeframes.
+            Express certainty levels for different aspects of your analysis (e.g., **High confidence: 80-90%**).
+
+            Your response must be well-structured markdown that renders properly in a React application.
             """,
                 ),
                 ("human", "{question}"),

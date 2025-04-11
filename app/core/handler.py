@@ -165,7 +165,7 @@ class ChatHandler:
             explorer_temp = min(1.0, self.temperature + 0.3)
             self._explorer_llm = ChatOpenAI(
                 model_name=self.model_name,  # type: ignore
-                temperature=explorer_temp,
+                temperature=explorer_temp,  # type: ignore
             )
         return self._explorer_llm
 
