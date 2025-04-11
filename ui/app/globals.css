@@ -1,0 +1,133 @@
+/* Add these slider styles to the end of the file */
+
+/* Slider styles */
+.slider-horizontal {
+  width: 100%;
+  height: 8px;
+  margin: 10px 0;
+}
+
+.slider-track {
+  top: 0;
+  height: 8px;
+  border-radius: 4px;
+  background-color: #4B5563; /* gray-600 */
+}
+
+.slider-track.slider-track-0 {
+  background: linear-gradient(to right, #0EA5E9, #2563EB); /* cyan-500 to blue-600 */
+}
+
+.slider-thumb {
+  cursor: pointer;
+  top: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  outline: none;
+  transition: transform 0.2s;
+}
+
+.slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.slider-thumb:active {
+  transform: scale(1.15);
+}
+
+/* Custom range input styling */
+
+/* Base slider style */
+input[type="range"] {
+  width: 100%;
+  margin: 10px 0;
+  height: 8px;
+  accent-color: #0EA5E9; /* Match color to the cyan-500 */
+}
+
+/* Remove default appearance for better styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #4B5563; /* gray-600 */
+  border-radius: 8px;
+  outline: none;
+}
+
+/* Track styling for Webkit browsers (Chrome, Safari, etc.) */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 8px;
+  background: #4B5563; /* gray-600 */
+}
+
+/* Fill effect for the active part of the track */
+input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    #0EA5E9 0%,
+    #2563EB var(--range-progress, 0%),
+    #4B5563 var(--range-progress, 0%)
+  );
+}
+
+/* Track styling for Firefox */
+input[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 8px;
+  background: #4B5563; /* gray-600 */
+}
+
+/* Progress bar fill for Firefox */
+input[type="range"]::-moz-range-progress {
+  height: 8px;
+  border-radius: 8px;
+  background: linear-gradient(to right, #0EA5E9, #2563EB);
+}
+
+/* Thumb styling for Webkit */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -6px; /* Centers the thumb */
+  border-radius: 50%;
+  background: white;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+/* Thumb styling for Firefox */
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+/* Hover and active states */
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+input[type="range"]:hover::-moz-range-thumb {
+  transform: scale(1.1);
+}
+
+input[type="range"]:active::-moz-range-thumb {
+  transform: scale(1.15);
+}

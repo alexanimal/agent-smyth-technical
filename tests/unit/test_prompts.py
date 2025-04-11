@@ -49,7 +49,7 @@ class TestPromptManager:
         messages = prompt.messages
 
         # Check we have the expected number of messages
-        assert len(messages) == 3
+        assert len(messages) == 4
 
         # Use our updated assertion helper
         assert_message_contains(messages[0], "financial advisor")
