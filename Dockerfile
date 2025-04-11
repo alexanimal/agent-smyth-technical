@@ -36,7 +36,7 @@ RUN echo '#!/bin/bash\n\
 set -e\n\
 # Start the application on the correct port
 \
-exec uvicorn app.main:app --host 0.0.0.0 --port 8002\n\
+exec uvicorn app.main:app --host 0.0.0.0 --port 8003\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Expose the correct port

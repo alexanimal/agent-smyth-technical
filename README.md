@@ -2,14 +2,35 @@
 
 [![codecov](https://codecov.io/github/alexanimal/agent-smyth-technical/graph/badge.svg?token=B2BI5398GF)](https://codecov.io/github/alexanimal/agent-smyth-technical)
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+  - [Module Structure](#module-structure)
+- [Prerequisites](#prerequisites)
+- [Setup and Installation](#setup-and-installation)
+- [Configuration](#configuration)
+- [Running the Application](#running-the-application)
+- [Development Workflow](#development-workflow)
+- [API Usage](#api-usage)
+- [Testing](#testing)
+- [CI/CD](#cicd)
+- [Building and Packaging](#building-and-packaging)
+- [Deployment Notes](#deployment-notes)
+- [Project Status](#project-status)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Overview
 
-This project provides a FastAPI-based API for a Retrieval-Augmented Generation (RAG) agent. The agent uses LangChain and OpenAI's models to answer user queries based on a knowledge base built from tweet data (expected in JSON format). It features automatic query classification, source attribution, background knowledge base loading with persistence, automated code quality checks, CI/CD pipelines, and detailed API documentation.
+This project provides a FastAPI-based API for a Retrieval-Augmented Generation (RAG) agent. The agent uses LangGraph, LangChain, and OpenAI's models to answer user queries based on a knowledge base built from tweet data (expected in JSON format). It features automatic query classification, source attribution, background knowledge base loading with persistence, automated code quality checks, CI/CD pipelines, and detailed API documentation.
 
 ## Key Features
 
-*   **RAG Implementation:** Answers queries using context retrieved from a tweet knowledge base.
+*   **Advanced RAG Implementation:** Answers queries using context retrieved from a tweet knowledge base with query classification, document ranking, and alternative viewpoint generation.
 *   **FastAPI Backend:** Asynchronous web framework for high performance.
+*   **LangGraph Workflow:** Directed graph-based workflow for structured RAG processing.
 *   **LangChain Integration:** Leverages LangChain for document loading, splitting, embedding, vector storage (FAISS), and QA chains.
 *   **OpenAI Embeddings & Models:** Uses OpenAI for generating embeddings and processing chat queries.
 *   **Tweet Data Source:** Builds knowledge base from JSON files containing tweet data (expected in `data` directory).
@@ -18,12 +39,69 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
     *   Uses parallel processing for faster document loading.
     *   Persists the FAISS vector store index and processed documents to disk (`faiss_index` directory) using pickle for efficient restarts.
     *   Includes integrity checks for the saved index.
+*   **Advanced Prompt Engineering:** Implements sophisticated prompting techniques like Chain-of-Thought and Self-Evaluation.
 *   **Poetry Dependency Management:** Uses Poetry for clear dependency declaration and environment management (`pyproject.toml`, `poetry.lock`).
 *   **Automated Code Quality:** Integrates `pre-commit` hooks with `black` and `isort` for consistent code formatting and import sorting before commits.
 *   **CI/CD Pipelines:** Includes GitHub Actions workflows (`ci.yaml`, `cd.yml`) for automated testing on push/pull requests and deployment on merges to main.
 *   **Automatic API Documentation:** Provides interactive Swagger UI (`/docs`) and ReDoc (`/redoc`).
 *   **Enhanced API Models:** Uses detailed Pydantic models for requests and responses.
 *   **Custom Headers & Middleware:** Includes informative headers and request logging.
+
+## Architecture
+
+The application follows a modular architecture with several key components:
+
+### Module Structure
+
+The application is organized into several modules, each with specific responsibilities:
+
+1. **RAG Module** (`/app/rag`): Core workflow implementation using LangGraph:
+   - Query classification
+   - Document retrieval and ranking
+   - Response generation with alternative viewpoints
+   - [View RAG Documentation](/app/rag/README.md)
+
+2. **Routers Module** (`/app/routers`): FastAPI endpoint definitions:
+   - Chat request processing
+   - Status and health monitoring
+   - [View Routers Documentation](/app/routers/README.md)
+
+3. **Schemas Module** (`/app/schemas`): Pydantic models for data validation:
+   - Request/response models with detailed validation
+   - Enumerated types and configuration schemas
+   - [View Schemas Documentation](/app/schemas/README.md)
+
+4. **Utils Module** (`/app/utils`): Utility functions for processing:
+   - Document handling and sentiment analysis
+   - Technical indicator extraction
+   - [View Utils Documentation](/app/utils/README.md)
+
+5. **Services Module** (`/app/services`): Application state and initialization:
+   - Knowledge base and chat handler management
+   - Dependency injection for FastAPI
+   - [View Services Documentation](/app/services/README.md)
+
+6. **Prompts Module** (`/app/prompts`): Template management for LLM interactions:
+   - Centralized prompt management
+   - Dynamic prompt construction based on query type
+   - Advanced prompting techniques (Chain-of-Thought, Tree-of-Thought)
+   - [View Prompts Documentation](/app/prompts/README.md)
+
+7. **Middleware Module** (`/app/middleware`): Request processing layers:
+   - Logging and monitoring
+   - Authentication and authorization
+   - Error handling and response formatting
+   - [View Middleware Documentation](/app/middleware/README.md)
+
+8. **Knowledge Base Module** (`/app/kb`): Data storage and retrieval:
+   - Tweet data ingestion and processing
+   - Vector embeddings and similarity search
+   - Persistence and caching
+   - [View KB Documentation](/app/kb/README.md)
+
+9. **Core Module** (`/app/core`): Core business logic components
+
+10. **Config Module** (`/app/config`): Application configuration and settings
 
 ## Prerequisites
 
@@ -241,3 +319,28 @@ Poetry handles building standard Python packages.
 *   Configure CORS (`allow_origins` in `app/config.py`) restrictively.
 *   Consider a reverse proxy (Nginx, Traefik) for SSL, load balancing, etc.
 *   The included `cd.yml` workflow provides an example of deploying via AWS CDK.
+
+## Project Status
+
+This project is actively maintained. Current development focuses on:
+- Expanding the knowledge base capabilities
+- Adding support for additional query types
+- Improving document ranking algorithms
+- Enhancing alternative viewpoint generation
+- Implementing more advanced prompt engineering techniques
+
+## Contributing
+
+Contributions are welcome! To contribute to this project:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`
+3. Make your changes and add tests
+4. Run tests to ensure they pass
+5. Submit a pull request with a detailed description of changes
+
+For more details on the codebase organization, see the [Application Structure Documentation](/app/README.md).
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
