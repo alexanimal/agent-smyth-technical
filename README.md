@@ -50,8 +50,6 @@ This project provides a FastAPI-based API for a Retrieval-Augmented Generation (
 
 The application follows a modular architecture with several key components:
 
-![RAG Architecture](https://mermaid.ink/img/pako:eNptUsluAyEM_RWLC1O1fADHHtpDL9NLTjlYMFO0iRFFU7VR8u-FCUwrlUfYfrbf4-DGhS24o7sY58QBzKsWjkEh-gwxQQHCwNMPjgE5XWGCp3FFVL7GnPO13n1fXqkJLzLYR4WLc4CU6RI99CBEpG3A1fUKYCCvYCJuX00wfqAvLBgjPqRSbEWR1aWcaUHlxCF5hAHtbWL8nWQExTgMPZ5G6KOtUqJZVA4xxgwW3yt3W1DjFJMrCF1Ifl6N7FeIJBIh_gT0yjOD9rYWg-Uv5H3HXM3sU8HRLMmEGXCTK9u8YuTPNQfww30JV_i-YeX8BmBuLZWuPEvGtj-8i1tgkn2rkKuphyXrPm5mSXRGWdJ5Vv4Nc5_YDJJIUVdlqDpWk1N_S14obnSOBo4Fx2JgmQTrhVrh9eLfr5ttEOKVlXsXNjSBVYBKq0aYQdeoobZytS0GZaU4yUGpoT1IJe2grGx01yzKS6OdHYQc8PLp_gBdILLl)
-
 ### Module Structure
 
 The application is organized into several modules, each with specific responsibilities:
