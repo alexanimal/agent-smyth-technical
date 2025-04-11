@@ -1089,7 +1089,7 @@ async def test_process_query_simplified():
             }
 
         # Replace the original method
-        handler.process_query = simplified_process_query
+        handler.process_query = simplified_process_query  # type: ignore
 
         try:
             # Execute our simplified version

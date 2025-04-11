@@ -60,7 +60,16 @@ async def test_stream_chat_endpoint():
     # Create a mock request and chat request
     mock_request = MagicMock(spec=Request)
     chat_request = ChatRequest(
-        message=TEST_QUERY, num_results=3, verbose=True, query_type=QueryType.INVESTMENT
+        message=TEST_QUERY,
+        num_results=3,
+        verbose=True,
+        query_type=QueryType.INVESTMENT,
+        ranking_weights={
+            "recency_weight": 0.3,
+            "view_weight": 0.3,
+            "like_weight": 0.2,
+            "retweet_weight": 0.2,
+        },
     )
 
     # Create a mock dependency override for get_current_chat_handler
@@ -111,7 +120,16 @@ async def test_stream_chat_endpoint():
         assert "complete" in event_types
 
         # Verify the handler was called with correct arguments
-        mock_handler.process_query.assert_called_once_with(message=TEST_QUERY, k=3)
+        mock_handler.process_query.assert_called_once_with(
+            message=TEST_QUERY,
+            k=3,
+            ranking_weights={
+                "recency_weight": 0.3,
+                "view_weight": 0.3,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            },
+        )
 
         # Verify the complete event has the expected data
         complete_event = [e for e in events if e.get("event") == "complete"][0]
@@ -132,7 +150,16 @@ async def test_stream_chat_error_handling():
     # Create a mock request and chat request
     mock_request = MagicMock(spec=Request)
     chat_request = ChatRequest(
-        message=TEST_QUERY, num_results=3, query_type=QueryType.INVESTMENT, verbose=True
+        message=TEST_QUERY,
+        num_results=3,
+        query_type=QueryType.INVESTMENT,
+        verbose=True,
+        ranking_weights={
+            "recency_weight": 0.3,
+            "view_weight": 0.3,
+            "like_weight": 0.2,
+            "retweet_weight": 0.2,
+        },
     )
 
     # Store the event generator for later inspection

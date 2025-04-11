@@ -110,7 +110,9 @@ def test_chat_endpoint(setup_mocks):
     assert "metadata" in response_data  # Check metadata structure if needed
 
     # Verify the mock handler in app_state was called correctly
-    setup_mocks.process_query.assert_called_once_with(message="Test message", k=3)
+    setup_mocks.process_query.assert_called_once_with(
+        message="Test message", k=3, ranking_weights=None
+    )
 
 
 def test_chat_endpoint_error(setup_mocks):

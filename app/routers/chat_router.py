@@ -71,6 +71,7 @@ async def handle_chat(
         result = await chat_service.process_query(
             message=request_body.message,
             k=request_body.num_results,
+            ranking_weights=request_body.ranking_weights,
             # Pass other relevant fields if needed, e.g., model override
             # model_override=request_body.model
         )
@@ -172,6 +173,7 @@ async def stream_chat(
             result = await chat_service.process_query(
                 message=request_body.message,
                 k=request_body.num_results,
+                ranking_weights=request_body.ranking_weights,
             )
 
             # For demonstration, split the response into chunks

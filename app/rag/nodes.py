@@ -18,6 +18,7 @@ from langchain_core.runnables import RunnableLambda, RunnableParallel, RunnableP
 from langchain_openai import ChatOpenAI
 
 from app.prompts import PromptManager
+from app.rag.scoring import diversify_ranked_documents, score_documents_with_social_metrics
 from app.rag.state import RAGState
 
 # Configure logging
@@ -153,8 +154,8 @@ async def rank_documents_node(state: RAGState) -> RAGState:
     """
     Node to rank and diversify documents.
 
-    This node re-ranks the retrieved documents based on recency and relevance,
-    optimizing for diversity of information and viewpoints.
+    This node re-ranks the retrieved documents based on recency, relevance,
+    and social engagement metrics, optimizing for diversity of information and viewpoints.
 
     Args:
         state: The current workflow state
@@ -175,29 +176,77 @@ async def rank_documents_node(state: RAGState) -> RAGState:
         if user_k < 10:
             final_k = min(int(user_k * 1.5), user_k + 5)
 
-    # Extract timestamp metadata for each document
-    valid_docs_with_ts = []
+    # Use ranking_config from state if provided, otherwise use defaults based on query type
+    ranking_config = state.get("ranking_config", {})
+
+    # Set default weights if not provided
+    if not ranking_config:
+        # Adjust weights based on query type
+        if query_type == "investment":
+            # For investment queries, prioritize engagement metrics more
+            ranking_config = {
+                "recency_weight": 0.3,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.3,
+            }
+        elif query_type == "technical":
+            # For technical analysis, recency matters more
+            ranking_config = {
+                "recency_weight": 0.5,
+                "view_weight": 0.1,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            }
+        else:
+            # Default balanced weights
+            ranking_config = {
+                "recency_weight": 0.4,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            }
+
+    # Validate docs have required metadata
+    valid_docs = []
     for doc in docs:
-        timestamp = doc.metadata.get("timestamp_unix")
-        if timestamp is not None:
+        # Check for timestamp which is required for ranking
+        if "timestamp_unix" in doc.metadata:
+            valid_docs.append(doc)
+        else:
+            logger.warning("Document missing timestamp_unix metadata. Skipping.")
+
+    if not valid_docs:
+        logger.warning("No valid documents with required metadata found for ranking.")
+        state["ranked_docs"] = []
+        return state
+
+    try:
+        # Score documents using social metrics
+        scored_docs = score_documents_with_social_metrics(valid_docs, ranking_config)
+
+        # Apply diversity to the ranked documents
+        diversity_factor = 0.3  # Could be tuned or passed in state
+        re_ranked_docs = diversify_ranked_documents(scored_docs, final_k, diversity_factor)
+
+        # Update state with ranked documents
+        state["ranked_docs"] = re_ranked_docs
+
+    except Exception as e:
+        logger.error(f"Error in document ranking: {e}", exc_info=True)
+        # Fallback to simple timestamp-based ranking
+        valid_docs_with_ts = []
+        for doc in valid_docs:
+            timestamp = doc.metadata.get("timestamp_unix")
             try:
                 valid_docs_with_ts.append((doc, float(timestamp)))
             except (ValueError, TypeError):
                 logger.warning(f"Invalid timestamp_unix: {timestamp}. Skipping.")
-        else:
-            logger.warning("Document missing timestamp_unix metadata. Skipping.")
 
-    # Simple diversity-aware re-ranking logic (simplified version)
-    # In a real implementation, you'd call the full _diversify_documents method
-    if valid_docs_with_ts:
-        # Just sort by timestamp (recency) for this simplified example
+        # Sort by timestamp (recency)
         valid_docs_with_ts.sort(key=lambda x: x[1], reverse=True)
         re_ranked_docs = [doc for doc, _ in valid_docs_with_ts[:final_k]]
-    else:
-        re_ranked_docs = []
-
-    # Update state with ranked documents
-    state["ranked_docs"] = re_ranked_docs
+        state["ranked_docs"] = re_ranked_docs
 
     return state
 

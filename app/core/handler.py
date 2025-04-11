@@ -190,7 +190,9 @@ class ChatHandler:
         """
         return extract_sources(documents)
 
-    async def process_query(self, message: str, k: int = 25) -> Dict[str, Any]:
+    async def process_query(
+        self, message: str, k: int = 25, ranking_weights: Optional[Dict[str, float]] = None
+    ) -> Dict[str, Any]:
         """
         Process a user query using the LangGraph workflow.
 
@@ -201,6 +203,7 @@ class ChatHandler:
         Args:
             message: The user's query text
             k: Number of documents to retrieve (default: 25)
+            ranking_weights: Optional custom weights for document ranking signals
 
         Returns:
             Dictionary containing the response, sources, and metadata
@@ -215,6 +218,15 @@ class ChatHandler:
             try:
                 start_time = time.time()
 
+                # Set default ranking weights if not provided
+                if ranking_weights is None:
+                    ranking_weights = {
+                        "recency_weight": 0.4,  # Default weight for recency (timestamp)
+                        "view_weight": 0.2,  # Default weight for view count
+                        "like_weight": 0.2,  # Default weight for like count
+                        "retweet_weight": 0.2,  # Default weight for retweet count
+                    }
+
                 # Initialize the state
                 initial_state = {
                     "query": message,
@@ -225,6 +237,7 @@ class ChatHandler:
                     "classification": {},
                     "alternative_viewpoints": None,
                     "num_results": k,  # Include the user-requested document count
+                    "ranking_config": ranking_weights,  # Include ranking configuration
                 }
 
                 # Run the workflow

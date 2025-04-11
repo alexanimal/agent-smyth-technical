@@ -77,7 +77,7 @@ class KnowledgeBaseManager:
 
     @staticmethod
     def metadata_extractor(record: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract metadata from a tweet record, including a Unix timestamp."""
+        """Extract metadata from a tweet record, including a Unix timestamp and social metrics."""
         created_at_str = record.get("createdAt", "")
         timestamp_unix: Optional[float] = None
         if created_at_str:
@@ -88,6 +88,27 @@ class KnowledgeBaseManager:
                 # Log a warning if parsing fails
                 logger.warning(f"Could not parse timestamp '{created_at_str}': {e}")
 
+        # Extract social engagement metrics with fallbacks to 0
+        view_count = record.get("viewCount", 0)
+        like_count = record.get("likeCount", 0)
+        retweet_count = record.get("retweetCount", 0)
+
+        # Handle non-integer values gracefully
+        try:
+            view_count = int(view_count)
+        except (ValueError, TypeError):
+            view_count = 0
+
+        try:
+            like_count = int(like_count)
+        except (ValueError, TypeError):
+            like_count = 0
+
+        try:
+            retweet_count = int(retweet_count)
+        except (ValueError, TypeError):
+            retweet_count = 0
+
         return {
             "id": record.get("id", ""),
             "created_at": created_at_str,  # Keep original string if needed
@@ -95,6 +116,9 @@ class KnowledgeBaseManager:
             "url": record.get("url", ""),
             "profile": record.get("profile", ""),
             "tweet_time": record.get("tweet_time", ""),  # Assuming this is different
+            "viewCount": view_count,  # Social engagement metrics
+            "likeCount": like_count,
+            "retweetCount": retweet_count,
         }
 
     @staticmethod

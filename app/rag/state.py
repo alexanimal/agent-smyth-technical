@@ -28,6 +28,7 @@ class RAGState(TypedDict):
         sources: List of source URLs used to generate the response
         alternative_viewpoints: Optional alternative perspective or counterargument
         num_results: The number of results requested by the user
+        ranking_config: Configuration for document ranking, including weights for different signals
     """
 
     query: str
@@ -38,3 +39,6 @@ class RAGState(TypedDict):
     sources: List[str]
     alternative_viewpoints: Optional[str]
     num_results: int  # Number of results requested by the user
+    ranking_config: Dict[
+        str, float
+    ]  # Weights for different ranking signals (recency, social metrics, etc.)

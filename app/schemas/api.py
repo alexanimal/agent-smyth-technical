@@ -49,6 +49,7 @@ class ChatRequest(BaseModel):
         num_results: Number of sources to retrieve and include
         query_type: Optional override for automatic query classification
         verbose: Whether to include detailed source information
+        ranking_weights: Optional configuration for ranking document sources
         context: Optional context information for the query
         model: The LLM model to use for processing the query
     """
@@ -70,6 +71,18 @@ class ChatRequest(BaseModel):
         None, description="Override automatic query classification"
     )
     verbose: bool = Field(False, description="Whether to include detailed source information")
+    ranking_weights: Optional[Dict[str, float]] = Field(
+        None,
+        description="Optional weights for document ranking signals. Keys: recency_weight, view_weight, like_weight, retweet_weight. Values should be between 0 and 1, and ideally sum to 1.",
+        json_schema_extra={
+            "example": {
+                "recency_weight": 0.3,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.3,
+            }
+        },
+    )
     # TODO: Add context and model into the request so UIs can swap between models and provide additional context
     # context: Optional[Dict[str, Any]] = Field(
     #     default={},
@@ -88,6 +101,12 @@ class ChatRequest(BaseModel):
             "example": {
                 "message": "What are the recent trends for AAPL stock?",
                 "num_results": 25,
+                "ranking_weights": {
+                    "recency_weight": 0.3,
+                    "view_weight": 0.2,
+                    "like_weight": 0.2,
+                    "retweet_weight": 0.3,
+                },
                 # "context": {"session_id": "user123"},
                 # "model": "gpt-4o",
             }
@@ -111,6 +130,43 @@ class ChatRequest(BaseModel):
         """
         if len(v.strip()) < 3:
             raise ValueError("Message must contain meaningful content (at least 3 chars)")
+        return v
+
+    @field_validator("ranking_weights")
+    @classmethod
+    def validate_ranking_weights(cls, v: Optional[Dict[str, float]]) -> Optional[Dict[str, float]]:
+        """
+        Validates the ranking weights.
+
+        Args:
+            v: Dictionary of ranking weights
+
+        Returns:
+            Validated ranking weights
+
+        Raises:
+            ValueError: If weights are invalid
+        """
+        if v is None:
+            return v
+
+        valid_keys = {"recency_weight", "view_weight", "like_weight", "retweet_weight"}
+
+        # Validate keys
+        for key in v:
+            if key not in valid_keys:
+                raise ValueError(f"Invalid ranking weight key: {key}. Valid keys are: {valid_keys}")
+
+        # Validate values
+        for key, value in v.items():
+            if not 0 <= value <= 1:
+                raise ValueError(f"Weight for {key} must be between 0 and 1")
+
+        # Check if weights sum to approximately 1
+        weight_sum = sum(v.values())
+        if not 0.98 <= weight_sum <= 1.02:  # Allow small rounding errors
+            raise ValueError(f"Weights should sum to approximately 1, got {weight_sum}")
+
         return v
 
 
