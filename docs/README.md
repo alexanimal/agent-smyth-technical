@@ -307,8 +307,8 @@ Our latest updates include a more comprehensive testing strategy:
 ## System Implementation Screenshots
 
 ### CI/CD Pipeline
-![Github Actions](gh-ci.png "Github Actions")
-This screenshot shows our Github Actions CI/CD pipeline that automatically tests, builds, and prepares the application for deployment. The workflow includes automated unit tests, integration tests, and security scanning to ensure code quality and reliability before deployment.
+![GitHub Actions](gh-ci.png "GitHub Actions")
+This screenshot shows our GitHub Actions CI/CD pipeline that automatically tests, builds, and prepares the application for deployment. The workflow includes automated unit tests, integration tests, and security scanning to ensure code quality and reliability before deployment.
 
 ### Continuous Deployment
 ![AWS Deploy](awsdeploy.png "AWS CD")
