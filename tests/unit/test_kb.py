@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, call, mock_open, patch
 
-import faiss
+import faiss  # type: ignore
 import numpy as np
 import pytest
 from langchain_community.document_loaders import JSONLoader

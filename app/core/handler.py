@@ -105,7 +105,7 @@ class ChatHandler:
         self._router: Optional[ChatRouter] = None
         self._technical_llm: Optional[BaseChatModel] = None
         self._explorer_llm: Optional[BaseChatModel] = None
-        self._model_instances = {}  # Cache for model instances
+        self._model_instances: Dict[str, BaseChatModel] = {}  # Cache for model instances
 
     def get_llm(self, model_name: Optional[str] = None) -> BaseChatModel:
         """
@@ -382,3 +382,15 @@ class ChatHandler:
                     # Max retries exceeded
                     logger.error(f"Max retries exceeded. Last error: {str(last_error)}")
                     raise last_error
+
+        # This code shouldn't be reached in normal operation due to the raise above,
+        # but adding a return to satisfy mypy
+        return {
+            "response": "Error: Maximum retry attempts exceeded",
+            "sources": [],
+            "processing_time": time.time() - start_time,
+            "query_type": "error",
+            "confidence_scores": {},
+            "model_used": model_to_use,
+            "error": str(last_error) if last_error else "Unknown error occurred",
+        }

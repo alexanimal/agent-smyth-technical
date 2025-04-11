@@ -31,6 +31,7 @@ class RAGState(TypedDict):
         ranking_config: Configuration for document ranking, including weights for different signals
         model: The name of the LLM model to use for generation
         generate_alternative_viewpoint: Whether to generate alternative viewpoints
+        generation_metrics: Dictionary containing metrics about the generation process
     """
 
     query: str
@@ -46,3 +47,4 @@ class RAGState(TypedDict):
     ]  # Weights for different ranking signals (recency, social metrics, etc.)
     model: Optional[str]  # The LLM model to use for generating responses
     generate_alternative_viewpoint: bool  # Whether to generate alternative viewpoints
+    generation_metrics: Optional[Dict[str, Any]]  # Metrics about the generation process

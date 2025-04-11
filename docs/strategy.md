@@ -35,6 +35,43 @@ My RAG system follows a multi-stage process to generate high-quality trading ide
 6. **LLM Inference** - Generate nuanced trading theses with the specialized model
 7. **Source Attribution** - Provide transparency by citing information sources
 
+### Social Signal Enhanced Ranking System
+
+Our latest enhancement incorporates social engagement metrics to improve document ranking relevance:
+
+- **Multi-factor Ranking Algorithm** - Documents are scored based on a weighted combination of:
+  - **Recency** - Timestamp-based scoring that prioritizes recent information
+  - **Likes** - Reflecting content's perceived value by financial community
+  - **Retweets/Shares** - Measuring amplification of information by experts
+  - **Views** - Capturing broader attention and importance
+
+- **Query-Adaptive Weighting** - Weights are dynamically adjusted based on query type:
+  - **Investment Queries**: {recency: 0.3, views: 0.2, likes: 0.2, retweets: 0.3}
+  - **Technical Analysis**: {recency: 0.5, views: 0.1, likes: 0.2, retweets: 0.2}
+  - **General Queries**: {recency: 0.4, views: 0.2, likes: 0.2, retweets: 0.2}
+
+- **Diversity Optimization** - Final document selection employs a diversity factor (0.3) to ensure:
+  - Balanced viewpoints (bullish/bearish)
+  - Varied information sources
+  - Different temporal perspectives
+  - Representation of both high-engagement and potentially overlooked content
+
+- **Configurable Ranking** - System accepts custom ranking configurations through the API, allowing portfolio managers to adjust document selection criteria based on their specific needs
+
+This enhanced ranking approach significantly improves the quality of generated trading ideas by ensuring the most relevant, socially validated, and temporally significant information is prioritized while maintaining diverse perspectives.
+
+### Enhanced Error Handling and Robustness
+
+Our latest updates have significantly improved the system's reliability through:
+
+- **Robust Timestamp Validation** - Comprehensive handling of invalid timestamp formats (None values, non-numeric strings, invalid types) in document metadata
+- **Graceful Fallback Mechanisms** - When primary ranking fails, the system falls back to simpler timestamp-based sorting
+- **Empty Result Handling** - Explicit handling for cases where no valid documents remain after filtering
+- **Type-Safe Implementation** - Improved type safety using Python's typing system and cast() functions for TypedDict operations
+- **Comprehensive Logging** - Enhanced error logging with detailed context for easier debugging and monitoring
+
+These improvements ensure that the system continues to function even when encountering problematic data or edge cases, providing a more reliable service to portfolio managers.
+
 ## Query Classification System
 
 I implemented a query classification system that routes questions to specialized handlers:
@@ -111,14 +148,109 @@ The system employs different temperature settings for specialized tasks:
 
 The document retrieval system dynamically adjusts based on query characteristics:
 
-- **Query Complexity**: More complex queries receive proportionally more context documents
-- **Viewpoint Diversity**: Documents are selected to balance recency (70%) and sentiment diversity (30%)
-- **Sentiment Analysis**: Each document receives a sentiment score to ensure balanced perspective
-- **Mixed Query Handling**: Queries spanning multiple categories receive broader context
+- **Query Complexity Adaptation** - More complex queries (technical, mixed-intent) receive proportionally more context documents:
+  - Standard queries: Base k documents
+  - Complex queries: Increased document count (up to 50% more for specialized analysis)
+  - Mixed-intent queries: Broader coverage across topics (minimum 5 additional documents)
+
+- **Multi-stage Retrieval Pipeline**:
+  1. **Initial Oversampling** - Retrieves 3x the final required documents to ensure diversity
+  2. **Social Signal Scoring** - Applies the multi-factor ranking algorithm (recency, likes, retweets, views)
+  3. **Viewpoint Balancing** - Documents are selected to balance recency (70%) and sentiment diversity (30%)
+  4. **Result Diversification** - Final selection optimized for information diversity using clustering techniques
+
+- **Metadata-Aware Processing** - Retrieval parameters incorporate document metadata:
+  - **Temporal Analysis** - Adjusts recency weighting based on query time horizon implications
+  - **Engagement Significance** - For trending topics, engagement signals receive higher weights
+  - **Source Verification** - Prioritizes verified sources for critical financial information
+
+- **Failover Protection** - If sophisticated ranking fails, system gracefully degrades to simpler recency-based sorting while maintaining functionality
+
+This adaptive retrieval approach ensures that the system delivers both highly relevant information (through social signal ranking) and diverse perspectives (through diversification algorithms), resulting in more comprehensive trading recommendations that portfolio managers can confidently act upon.
 
 These advanced prompting strategies significantly enhance the quality and reliability of trading recommendations by systematically reducing biases, considering diverse perspectives, and providing appropriately calibrated confidence levels for financial decision-making.
 
 ## Technical Implementation Details
+
+### LangGraph Implementation
+
+Our most significant architectural improvement has been migrating our RAG pipeline to a LangGraph-based workflow:
+
+- **Node-Based Architecture** - The RAG pipeline is now structured as a directed graph with specialized nodes:
+  - `classify_query_node` - Determines query intent and confidence distribution
+  - `retrieve_documents_node` - Handles vector database retrieval with dynamic parameters
+  - `rank_documents_node` - Applies social signal scoring and diversity optimization
+  - `generate_response_node` - Produces the primary response with source attribution
+  - `generate_alternative_node` - Creates counterarguments for balanced analysis
+
+```
+┌───────────────────┐
+│                   │
+│  User Query       │
+│                   │
+└─────────┬─────────┘
+          │
+          ▼
+┌─────────────────────┐
+│                     │
+│  classify_query_node│
+│                     │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│                     │
+│retrieve_documents_  │
+│       node          │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│                     │
+│  rank_documents_    │
+│       node          │
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐      ┌─────────────────────┐
+│                     │      │                     │
+│  generate_response_ ├──────►  generate_          │
+│       node          │      │  alternative_node   │
+│                     │      │                     │
+└─────────┬───────────┘      └─────────┬───────────┘
+          │                            │
+          ▼                            ▼
+┌───────────────────┐      ┌────────────────────┐
+│  Primary Response │      │ Alternative        │
+│  with Sources     │      │ Viewpoint          │
+└───────────────────┘      └────────────────────┘
+```
+
+- **State Management Benefits**
+  - **Typed State Schema** - TypedDict-based state validation ensures data integrity throughout the workflow
+  - **Immutable State Transitions** - Each node receives and returns a complete state object, improving debuggability
+  - **Explicit Dependency Graph** - Clear visualization of information flow and component relationships
+  - **Conditional Execution Paths** - Routes queries through specialized processing branches based on classification
+
+- **Enhanced Testability**
+  - **Isolated Node Testing** - Each functional component can be independently unit tested
+  - **State Snapshot Verification** - Easy assertion of state transformations at each pipeline stage
+  - **Mock Integration** - Simplified testing with standardized node input/output interfaces
+  - **Failure Injection** - Targeted introduction of errors to validate robustness
+
+- **Observability Improvements**
+  - **Execution Tracing** - Detailed step-by-step tracking of state transformations
+  - **Performance Profiling** - Per-node timing metrics for identifying bottlenecks
+  - **State Inspection** - Runtime visibility into intermediate results
+  - **Metrics Collection** - Automatic generation of operational statistics
+
+- **Deployment Flexibility**
+  - **Parallel Execution** - Independent nodes can be executed concurrently
+  - **Serverless Compatibility** - Graph structure maps naturally to event-driven architectures
+  - **Incremental Updates** - Individual nodes can be improved without rebuilding entire pipeline
+  - **A/B Testing** - Multiple graph variants can run simultaneously to evaluate improvements
+
+This graph-based architecture has significantly enhanced the maintainability, reliability, and extensibility of our trading ideas service, while providing clearer visibility into the reasoning process that generates recommendations.
 
 ### Knowledge Base Processing
 
@@ -158,6 +290,19 @@ I implemented several features to ensure system reliability:
 - Grace period configuration for proper initialization
 - Sentry integration for error tracking and performance monitoring
 - Structured logging for debugging and analysis
+- Comprehensive exception handling to ensure graceful degradation
+- Type-safe implementation with proper validation of external data
+
+These reliability features ensure the system can handle edge cases gracefully, maintaining service availability even when encountering problematic data or unexpected situations. Our latest updates have significantly improved error handling throughout the RAG pipeline, particularly in document processing and ranking components.
+
+## Enhanced Testing Strategy
+
+Our latest updates include a more comprehensive testing strategy:
+
+- **Edge Case Coverage** - Tests for invalid data formats, empty result sets, and other edge cases
+- **Mock-Based Testing** - Advanced mocking techniques for isolated component testing
+- **Failure Mode Testing** - Explicit tests for fallback behavior when primary mechanisms fail
+- **Type Checking** - Static type analysis for early error detection
 
 ## System Implementation Screenshots
 
@@ -180,6 +325,10 @@ The Sentry dashboard provides real-time visibility into application errors and e
 ### Performance Monitoring
 ![Sentry Dashboard](traces.png "Performance Traces")
 Performance traces showing request processing time across different components of the system. These traces help identify bottlenecks in the RAG pipeline, allowing us to optimize the retrieval and generation processes for faster response times.
+
+### LangGraph Workflow Visualization
+![LangGraph Dashboard](langgraph.png "LangGraph Workflow Dashboard")
+The LangGraph dashboard provides a real-time visualization of our RAG workflow execution. This interactive view shows the flow of information through each node, the state transformations at each step, and performance metrics for individual components. It's an invaluable tool for debugging, optimization, and explaining the system's decision-making process to stakeholders.
 
 ### User Interface
 ![Simple Chat Interface](simpleui.png "Basic UI to interact with API")

@@ -10,7 +10,7 @@ import json
 import logging
 import time
 from operator import itemgetter
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
@@ -56,6 +56,23 @@ def ensure_string_content(message_or_string: Any) -> Any:
         return str(message_or_string)
 
     return message_or_string
+
+
+def ensure_generation_metrics(state: RAGState) -> Dict[str, Any]:
+    """
+    Ensure the generation_metrics field exists in the state and return it.
+
+    Args:
+        state: The RAG state dictionary
+
+    Returns:
+        The generation_metrics dictionary
+    """
+    if "generation_metrics" not in state:
+        state["generation_metrics"] = {}
+
+    # Use cast to tell mypy this is not None
+    return cast(Dict[str, Any], state["generation_metrics"])
 
 
 async def classify_query_node(state: RAGState) -> RAGState:
@@ -203,6 +220,12 @@ async def rank_documents_node(state: RAGState) -> RAGState:
     This node re-ranks the retrieved documents based on recency, relevance,
     and social engagement metrics, optimizing for diversity of information and viewpoints.
 
+    Robust error handling ensures:
+    - Documents with missing timestamp metadata are skipped
+    - Invalid timestamp formats (None, non-numeric strings, invalid types) are properly handled
+    - When social metric scoring fails, fallback to simple timestamp-based sorting
+    - If no valid documents remain after filtering, an empty list is returned
+
     Args:
         state: The current workflow state
 
@@ -285,14 +308,28 @@ async def rank_documents_node(state: RAGState) -> RAGState:
         for doc in valid_docs:
             timestamp = doc.metadata.get("timestamp_unix")
             try:
-                valid_docs_with_ts.append((doc, float(timestamp)))
-            except (ValueError, TypeError):
-                logger.warning(f"Invalid timestamp_unix: {timestamp}. Skipping.")
+                # Convert timestamp to float, handle both None and non-numeric strings
+                if timestamp is not None:
+                    timestamp_float = float(timestamp)
+                    valid_docs_with_ts.append((doc, timestamp_float))
+                else:
+                    logger.warning(f"Null timestamp_unix found. Skipping document.")
+            except (ValueError, TypeError) as conversion_error:
+                # Handle conversion errors (e.g., non-numeric strings)
+                logger.warning(
+                    f"Invalid timestamp_unix value: {timestamp}. Error: {conversion_error}. Skipping document."
+                )
 
         # Sort by timestamp (recency)
-        valid_docs_with_ts.sort(key=lambda x: x[1], reverse=True)
-        re_ranked_docs = [doc for doc, _ in valid_docs_with_ts[:final_k]]
-        state["ranked_docs"] = re_ranked_docs
+        if valid_docs_with_ts:
+            valid_docs_with_ts.sort(key=lambda x: x[1], reverse=True)
+            re_ranked_docs = [doc for doc, _ in valid_docs_with_ts[:final_k]]
+            state["ranked_docs"] = re_ranked_docs
+        else:
+            logger.warning(
+                "No documents with valid timestamps after filtering. Returning empty list."
+            )
+            state["ranked_docs"] = []
 
     return state
 
@@ -324,11 +361,10 @@ async def generate_response_node(state: RAGState) -> RAGState:
     if not docs:
         state["response"] = "I couldn't find any relevant information."
         state["sources"] = []
-        state["generation_metrics"] = {
-            "model": model_name,
-            "generation_time": 0,
-            "document_count": 0,
-        }
+        metrics = ensure_generation_metrics(state)
+        metrics["model"] = model_name
+        metrics["generation_time"] = 0
+        metrics["document_count"] = 0
         return state
 
     # Extract document content and build context string
@@ -370,7 +406,7 @@ async def generate_response_node(state: RAGState) -> RAGState:
         # Use our utility for generation with fallback
         response = await generate_with_fallback(
             prompt=prompt_messages,
-            model_name=model_name or settings.default_model,
+            model_name=model_name if model_name is not None else settings.default_model,
             fallback_model="gpt-3.5-turbo",  # Fallback to a simpler model if needed
             temperature=temperature,
         )
@@ -399,18 +435,16 @@ async def generate_response_node(state: RAGState) -> RAGState:
             response_length = 0
 
         # Record metrics for monitoring and tracking
-        generation_metrics = {
-            "model": model_name,
-            "generation_time": generation_time,
-            "document_count": len(docs),
-            "context_length": len(context_string),
-            "response_length": response_length,
-        }
+        metrics = ensure_generation_metrics(state)
+        metrics["model"] = model_name
+        metrics["generation_time"] = generation_time
+        metrics["document_count"] = len(docs)
+        metrics["context_length"] = len(context_string)
+        metrics["response_length"] = response_length
 
         # Update state
         state["response"] = parsed_response
         state["sources"] = list(set(sources))  # Deduplicate sources
-        state["generation_metrics"] = generation_metrics
 
     except Exception as e:
         logger.error(f"Error generating response: {str(e)}", exc_info=True)
@@ -418,11 +452,11 @@ async def generate_response_node(state: RAGState) -> RAGState:
             "I'm sorry, I encountered an error while generating a response. Please try again."
         )
         state["sources"] = []
-        state["generation_metrics"] = {
-            "model": model_name,
-            "error": str(e),
-            "document_count": len(docs),
-        }
+        metrics = ensure_generation_metrics(state)
+        metrics["model"] = model_name
+        metrics["error"] = str(e)
+        metrics["document_count"] = len(docs)
+        metrics["generation_time"] = generation_time
 
     return state
 
@@ -494,7 +528,7 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
                 # Use a higher temperature for exploring alternatives
                 alternative_response = await generate_with_fallback(
                     prompt=prompt_messages,
-                    model_name=model_name,
+                    model_name=model_name if model_name is not None else settings.default_model,
                     fallback_model="gpt-3.5-turbo",
                     temperature=0.7,  # Higher temperature for more creative alternatives
                 )
@@ -511,15 +545,15 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
                 # Update state
                 state["alternative_viewpoints"] = alternative_viewpoints
 
-                if "generation_metrics" in state:
-                    state["generation_metrics"]["alternative_time"] = generation_time
+                metrics = ensure_generation_metrics(state)
+                metrics["alternative_time"] = generation_time
             else:
                 logger.warning(f"No prompt template found for query type: {query_type}")
 
         except Exception as e:
             logger.warning(f"Failed to generate alternative viewpoints: {str(e)}")
             # Record the error but don't fail the whole process
-            if "generation_metrics" in state:
-                state["generation_metrics"]["alternative_error"] = str(e)
+            metrics = ensure_generation_metrics(state)
+            metrics["alternative_error"] = str(e)
 
     return state

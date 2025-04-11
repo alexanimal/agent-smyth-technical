@@ -55,6 +55,7 @@ class TestClassifyQueryNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
     @pytest.mark.asyncio
@@ -213,6 +214,7 @@ class TestClassifyQueryNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
         # Create a mock chain that raises an exception
@@ -269,6 +271,7 @@ class TestRetrieveDocumentsNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
     @pytest.mark.asyncio
@@ -431,6 +434,7 @@ class TestRetrieveDocumentsNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
         # Create mock documents
@@ -491,6 +495,7 @@ class TestRetrieveDocumentsNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
         # Create mock documents
@@ -563,6 +568,7 @@ class TestRankDocumentsNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
     @pytest.mark.asyncio
@@ -614,6 +620,7 @@ class TestRankDocumentsNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
         result = await rank_documents_node(state)
@@ -625,9 +632,54 @@ class TestRankDocumentsNode:
         doc1 = Document(page_content="Test content 1", metadata={"timestamp_unix": None})
         doc2 = Document(page_content="Test content 2", metadata={})
         doc3 = Document(page_content="Test content 3", metadata={"timestamp_unix": "invalid"})
+        doc4 = Document(
+            page_content="Test content 4", metadata={"timestamp_unix": []}
+        )  # Invalid type
+        doc5 = Document(
+            page_content="Test content 5", metadata={"timestamp_unix": {}}
+        )  # Another invalid type
 
         state: RAGState = {
             "query": "What is the current stock price?",
+            "classification": {
+                "query_type": "investment",
+                "confidence_scores": {"investment": 80, "technical": 10, "general": 10},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [doc1, doc2, doc3, doc4, doc5],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 25,
+            "ranking_config": {
+                "k": 15,
+                "oversample_factor": 3,
+            },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
+            "generation_metrics": {},
+        }
+
+        result = await rank_documents_node(state)
+        assert result["ranked_docs"] == []
+
+    @pytest.mark.asyncio
+    @patch("app.rag.nodes.logger")
+    @patch("app.rag.nodes.diversify_ranked_documents")
+    @patch("app.rag.nodes.score_documents_with_social_metrics")
+    async def test_rank_documents_fallback_behavior(
+        self, mock_score_docs, mock_diversify, mock_logger
+    ):
+        """Test fallback behavior of rank_documents_node when primary ranking fails."""
+        # Create a mix of valid and invalid documents
+        doc1 = Document(page_content="Valid doc 1", metadata={"timestamp_unix": 1000.0})
+        doc2 = Document(page_content="Valid doc 2", metadata={"timestamp_unix": 2000.0})
+        doc3 = Document(page_content="Invalid doc", metadata={"timestamp_unix": "invalid"})
+
+        # Create state for this test
+        state: RAGState = {
+            "query": "Test query",
             "classification": {
                 "query_type": "investment",
                 "confidence_scores": {"investment": 80, "technical": 10, "general": 10},
@@ -645,10 +697,69 @@ class TestRankDocumentsNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
+        # Make the primary ranking method fail
+        mock_score_docs.side_effect = Exception("Simulated ranking failure")
+
+        # Execute the function
         result = await rank_documents_node(state)
+
+        # Verify fallback behavior was triggered
+        mock_logger.error.assert_called_once()
+        mock_logger.warning.assert_any_call(
+            "Invalid timestamp_unix value: invalid. Error: could not convert string to float: 'invalid'. Skipping document."
+        )
+
+        # Verify that valid documents were still ranked correctly
+        assert len(result["ranked_docs"]) == 2
+
+        # Verify documents are sorted by timestamp (newest first)
+        assert result["ranked_docs"][0].metadata["timestamp_unix"] == 2000.0
+        assert result["ranked_docs"][1].metadata["timestamp_unix"] == 1000.0
+
+        # Verify the diversify function was not called (we used fallback)
+        mock_diversify.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("app.rag.nodes.logger")
+    async def test_rank_documents_empty_after_filtering(self, mock_logger):
+        """Test behavior when all documents have invalid timestamps."""
+        # Create state with only invalid documents
+        state: RAGState = {
+            "query": "Test query",
+            "classification": {
+                "query_type": "general",
+                "confidence_scores": {"general": 100},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [
+                Document(page_content="Doc 1", metadata={"timestamp_unix": "invalid"}),
+                Document(page_content="Doc 2", metadata={"timestamp_unix": None}),
+                Document(page_content="Doc 3", metadata={}),
+            ],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 10,
+            "ranking_config": {},
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
+            "generation_metrics": {},
+        }
+
+        # Execute function
+        result = await rank_documents_node(state)
+
+        # Verify empty result
         assert result["ranked_docs"] == []
+
+        # Verify appropriate warning was logged
+        mock_logger.warning.assert_any_call(
+            "No documents with valid timestamps after filtering. Returning empty list."
+        )
 
 
 class TestGenerateResponseNode:
@@ -678,6 +789,7 @@ class TestGenerateResponseNode:
             },
             "generate_alternative_viewpoint": False,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
     @pytest.mark.asyncio
@@ -841,6 +953,7 @@ class TestGenerateAlternativeNode:
             },
             "generate_alternative_viewpoint": True,
             "model": "gpt-4o",
+            "generation_metrics": {},
         }
 
     @pytest.mark.asyncio
