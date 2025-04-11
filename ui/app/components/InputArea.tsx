@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useChat } from '../hooks/useChat'
+import { useChatWithMetadata } from '../hooks/useChatWithMetadata'
 import { useSettingsStore } from '../store/settingsStore'
+
+// Define the maximum character limit
+const MAX_CHAR_LIMIT = 2000
+const WARNING_THRESHOLD = 0.8 // 80% of max chars
 
 /**
  * Input area component for text entry and message submission
- * Features expandable text area and settings button
+ * Features expandable text area and settings button with character limit indicator
  */
 export const InputArea: React.FC = () => {
   const [inputValue, setInputValue] = useState('')
@@ -12,9 +16,16 @@ export const InputArea: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const { sendMessage, isLoading, cancelRequest } = useChat()
+  const { sendMessage, isLoading, cancelRequest } = useChatWithMetadata()
   const settings = useSettingsStore()
+
+  // Calculate character count and determine if within limits
+  const charCount = inputValue.length
+  const isApproachingLimit = charCount > MAX_CHAR_LIMIT * WARNING_THRESHOLD
+  const isAtLimit = charCount >= MAX_CHAR_LIMIT
 
   // Handle clicking outside settings menu to close it
   useEffect(() => {
@@ -32,15 +43,31 @@ export const InputArea: React.FC = () => {
 
   // Auto-resize the textarea as content changes
   useEffect(() => {
-    if (textareaRef.current && isExpanded) {
-      textareaRef.current.style.height = 'inherit'
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`
+    const resizeTextarea = () => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'inherit'
+        const newHeight = Math.min(textareaRef.current.scrollHeight, 200)
+        textareaRef.current.style.height = `${newHeight}px`
+      }
+    }
+
+    if (isExpanded) {
+      resizeTextarea()
     }
   }, [inputValue, isExpanded])
 
+  // Focus input when expanded state changes
+  useEffect(() => {
+    if (isExpanded && textareaRef.current) {
+      textareaRef.current.focus()
+    } else if (!isExpanded && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [isExpanded])
+
   // Handle sending message
   const handleSendMessage = () => {
-    if (inputValue.trim() && !isLoading) {
+    if (inputValue.trim() && !isLoading && !isAtLimit) {
       sendMessage(inputValue)
       setInputValue('')
       setIsExpanded(false)
@@ -52,6 +79,16 @@ export const InputArea: React.FC = () => {
     }
   }
 
+  // Handle input changes with character limit enforcement
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const newValue = e.target.value
+
+    // Only update if under character limit or if deleting text
+    if (newValue.length <= MAX_CHAR_LIMIT || newValue.length < inputValue.length) {
+      setInputValue(newValue)
+    }
+  }
+
   // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Submit on Enter (but not with Shift+Enter which adds a new line)
@@ -60,48 +97,87 @@ export const InputArea: React.FC = () => {
       handleSendMessage()
     }
 
-    // Expand on Shift+Enter
-    if (e.key === 'Enter' && e.shiftKey && !isExpanded) {
-      setIsExpanded(true)
+    // Expand on Shift+Enter or when text gets longer
+    if ((e.key === 'Enter' && e.shiftKey) || inputValue.length > 50) {
+      if (!isExpanded) {
+        setIsExpanded(true)
+      }
     }
 
     // Cancel request with Escape
-    if (e.key === 'Escape' && isLoading) {
-      cancelRequest()
+    if (e.key === 'Escape') {
+      if (isLoading) {
+        cancelRequest()
+      } else if (isExpanded) {
+        setIsExpanded(false)
+      }
     }
   }
 
   return (
     <div className="border-t dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
-      <div className="relative max-w-4xl mx-auto">
+      <div ref={containerRef} className="relative max-w-4xl mx-auto">
         {isExpanded ? (
-          <textarea
-            ref={textareaRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message... (Shift+Enter for new line, Esc to cancel)"
-            className={`w-full p-3 pr-16 rounded-lg border ${isLoading ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-950'}
-                       dark:text-white border-gray-300 dark:border-gray-700 shadow-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message... (Shift+Enter for new line, Esc to minimize)"
+              className={`w-full p-3 pr-16 rounded-lg border
+                       ${isLoading ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-950'}
+                       ${isAtLimit ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-gray-700 focus:ring-blue-500 focus:border-transparent'}
+                       dark:text-white shadow-sm
+                       focus:outline-none focus:ring-2
                        transition-all duration-200 ease-in-out resize-none`}
-            rows={3}
-            disabled={isLoading}
-          />
+              disabled={isLoading}
+            />
+
+            {/* Character count indicator */}
+            <div
+              className={`absolute bottom-2 right-16 text-xs ${
+                isAtLimit
+                  ? 'text-red-500 font-medium'
+                  : isApproachingLimit
+                    ? 'text-amber-500'
+                    : 'text-gray-400'
+              }`}
+            >
+              {charCount}/{MAX_CHAR_LIMIT}
+            </div>
+          </div>
         ) : (
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => inputValue.length > 50 && setIsExpanded(true)}
-            placeholder="Type your message..."
-            className={`w-full p-3 pr-16 rounded-full border ${isLoading ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-950'}
-                      dark:text-white border-gray-300 dark:border-gray-700 shadow-sm
-                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => inputValue.length > 50 && setIsExpanded(true)}
+              placeholder="Type your message..."
+              className={`w-full p-3 pr-16 rounded-full border ${isLoading ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-950'}
+                      ${isAtLimit ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-gray-700 focus:ring-blue-500 focus:border-transparent'}
+                      dark:text-white shadow-sm
+                      focus:outline-none focus:ring-2
                       transition-all duration-200 ease-in-out`}
-            disabled={isLoading}
-          />
+              disabled={isLoading}
+            />
+
+            {/* Only show character count if approaching limit */}
+            {(isApproachingLimit || isAtLimit) && (
+              <div
+                className={`absolute bottom-2 right-16 text-xs ${
+                  isAtLimit
+                    ? 'text-red-500 font-medium'
+                    : 'text-amber-500'
+                }`}
+              >
+                {charCount}/{MAX_CHAR_LIMIT}
+              </div>
+            )}
+          </div>
         )}
 
         <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
@@ -174,6 +250,16 @@ export const InputArea: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Max Character Setting */}
+                <div className="mb-3">
+                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Max Characters: {MAX_CHAR_LIMIT}
+                  </label>
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span>Character limit for messages</span>
+                  </div>
+                </div>
+
                 {/* Alternative Opinions */}
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Alternative Opinions</label>
@@ -195,13 +281,14 @@ export const InputArea: React.FC = () => {
           <button
             type="button"
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading}
+            disabled={!inputValue.trim() || isLoading || isAtLimit}
             className={`p-2 rounded-full ${
-              !inputValue.trim() || isLoading
+              !inputValue.trim() || isLoading || isAtLimit
                 ? 'bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed'
                 : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700'
             } transition-all duration-200`}
             aria-label="Send message"
+            title={isAtLimit ? "Message exceeds character limit" : "Send message"}
           >
             {isLoading ? (
               <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
