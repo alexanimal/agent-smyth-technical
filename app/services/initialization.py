@@ -20,11 +20,9 @@ from typing import cast
 
 from fastapi import HTTPException
 
-from .chat import ChatHandler
-from .config import MOCKS_DIR_PATH, settings  # Import path and settings
-
-# Use relative imports within src
-from .kb import KnowledgeBaseManager
+from app.config import MOCKS_DIR_PATH, settings  # Updated import path
+from app.core.handler import ChatHandler
+from app.kb import KnowledgeBaseManager  # Updated import path
 
 logger = logging.getLogger(__name__)
 

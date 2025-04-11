@@ -9,6 +9,7 @@ questions and receiving detailed responses with source attribution.
 """
 
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -24,6 +25,9 @@ from .services import initialize_services
 # Setup Logging and Sentry based on config
 # Do this before other imports that might log
 setup_logging_and_sentry(settings)
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 # Define lifespan manager

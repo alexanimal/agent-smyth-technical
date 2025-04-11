@@ -45,13 +45,27 @@ class KnowledgeBaseManager:
             mocks_dir: Optional override for the mocks directory path (as string)
         """
         # Determine project root dynamically inside __init__
-        project_root = Path(__file__).resolve().parent.parent
+        project_root = Path(__file__).resolve().parent.parent.parent
+        print(f"Project root: {project_root}")
 
         if mocks_dir:
             self.mocks_dir = mocks_dir
         else:
             # Define mocks_dir relative to the dynamically found project root
+            # Fix: directly set the path to the data directory at project root level
             self.mocks_dir = str(project_root / "data")
+
+            # Check if the directory doesn't exist, try app/data as fallback
+            if not os.path.exists(self.mocks_dir):
+                print(f"Data directory not found at {self.mocks_dir}, checking alternate location")
+                self.mocks_dir = str(project_root / "app" / "data")
+
+                # If that doesn't exist either, default back to project_root/data
+                if not os.path.exists(self.mocks_dir):
+                    print(
+                        f"Data directory not found at alternate location either, using {str(project_root / 'data')}"
+                    )
+                    self.mocks_dir = str(project_root / "data")
 
         # Log the resolved path to help with debugging
         print(f"Using mocks directory: {self.mocks_dir}")
@@ -100,6 +114,7 @@ class KnowledgeBaseManager:
 
     async def load_documents(self, batch_size: int = 1000) -> List[Document]:
         """Load documents using parallel processing."""
+        print(f"Loading documents from {self.mocks_dir}")
         json_files = glob.glob(os.path.join(self.mocks_dir, "*.json"))
 
         print(f"Found {len(json_files)} JSON files in {self.mocks_dir}")
@@ -401,7 +416,7 @@ def process_file(json_file_path):
 async def load_documents(batch_size: int = 1000) -> List[Document]:
     """Load all JSON documents using multiprocessing."""
     # Determine mocks directory path independently for this standalone function
-    project_root = Path(__file__).resolve().parent.parent
+    project_root = Path(__file__).resolve().parent.parent.parent
     mocks_dir_path = project_root / "data"
 
     print(f"Using mocks directory (standalone): {mocks_dir_path}")

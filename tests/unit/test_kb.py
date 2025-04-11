@@ -8,16 +8,19 @@ import json
 import os
 import pickle
 import sys
+from concurrent.futures import ProcessPoolExecutor  # Import ProcessPoolExecutor directly
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
+from langchain.document_loaders import JSONLoader  # Import JSONLoader
+from langchain.embeddings.openai import OpenAIEmbeddings  # Import specific OpenAI embeddings class
+from langchain.schema import Document  # Import Document directly from langchain
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from app.kb import (
-    Document,
     KnowledgeBaseManager,
     extract_content,
     load_documents,
@@ -93,7 +96,7 @@ def invalid_documents_few_sources():
 @pytest.fixture
 def mock_embeddings():
     """Mock OpenAIEmbeddings to avoid API calls."""
-    with patch("app.kb.OpenAIEmbeddings") as mock_embeddings:
+    with patch("app.kb.manager.OpenAIEmbeddings") as mock_embeddings:
         # Create a mock embeddings instance
         mock_instance = MagicMock()
         mock_embeddings.return_value = mock_instance
@@ -226,7 +229,7 @@ def test_extract_content_missing_fields():
 #################################################
 
 
-@patch("app.kb.JSONLoader")
+@patch("app.kb.manager.JSONLoader")
 def test_process_file(mock_loader):
     """Test the process_file static method."""
     # Setup mocks
@@ -246,7 +249,7 @@ def test_process_file(mock_loader):
     mock_loader_instance.load.assert_called_once()
 
 
-@patch("app.kb.JSONLoader")
+@patch("app.kb.manager.JSONLoader")
 def test_process_file_handles_exceptions(mock_loader):
     """Test that process_file handles exceptions properly."""
     # Setup mock to raise an exception
@@ -261,7 +264,7 @@ def test_process_file_handles_exceptions(mock_loader):
     assert result == []
 
 
-@patch("app.kb.JSONLoader")
+@patch("app.kb.manager.JSONLoader")
 def test_process_file_standalone(mock_loader):
     """Test the standalone process_file function."""
     # Setup mock JSONLoader
@@ -287,9 +290,9 @@ def test_process_file_standalone(mock_loader):
 
 
 @pytest.mark.asyncio
-@patch("app.kb.glob.glob")
-@patch("app.kb.ProcessPoolExecutor")
-@patch("app.kb.multiprocessing.cpu_count", return_value=2)  # Ensure at least 2 workers
+@patch("app.kb.manager.glob.glob")
+@patch("app.kb.manager.ProcessPoolExecutor")
+@patch("app.kb.manager.multiprocessing.cpu_count", return_value=2)  # Ensure at least 2 workers
 async def test_load_documents(mock_cpu_count, mock_executor, mock_glob, kb_manager):
     """Test the load_documents method with multiprocessing."""
     # Setup mocks
@@ -357,7 +360,7 @@ async def test_load_documents_ensures_min_workers(kb_manager):
     """Test that load_documents ensures at least 1 worker."""
     # Use a non-empty list of files to ensure the ProcessPoolExecutor is created
     with (
-        patch("app.kb.ProcessPoolExecutor") as mock_executor,
+        patch("app.kb.manager.ProcessPoolExecutor") as mock_executor,
         patch("glob.glob", return_value=["/fake/path/file1.json", "/fake/path/file2.json"]),
         patch("multiprocessing.cpu_count", return_value=4),
         patch("concurrent.futures.as_completed", return_value=[]),
@@ -520,7 +523,7 @@ def test_check_index_integrity_missing_file(kb_manager):
 
 @pytest.mark.asyncio
 @patch("os.path.exists")
-@patch("app.kb.FAISS")
+@patch("app.kb.manager.FAISS")
 async def test_load_existing_index(mock_faiss, mock_exists, kb_manager, mock_embeddings):
     """Test loading an existing index."""
     # Setup mocks
@@ -541,7 +544,7 @@ async def test_load_existing_index(mock_faiss, mock_exists, kb_manager, mock_emb
 
 @pytest.mark.asyncio
 @patch("os.path.exists")
-@patch("app.kb.FAISS")
+@patch("app.kb.manager.FAISS")
 async def test_create_new_index_when_loading_fails(
     mock_faiss, mock_exists, kb_manager, mock_embeddings
 ):
@@ -556,7 +559,7 @@ async def test_create_new_index_when_loading_fails(
     ):
         # Mock text splitter
         with patch(
-            "app.kb.RecursiveCharacterTextSplitter.split_documents",
+            "app.kb.manager.RecursiveCharacterTextSplitter.split_documents",
             return_value=[Document(page_content="Test", metadata={})],
         ):
             # Mock FAISS from_documents
@@ -587,7 +590,7 @@ async def test_save_index(kb_manager):
 
 
 @pytest.mark.asyncio
-@patch("app.kb.FAISS")
+@patch("app.kb.manager.FAISS")
 async def test_full_workflow(mock_faiss, kb_manager, mock_embeddings):
     """Test the full workflow of creating and saving an index."""
     # Setup mocks
@@ -598,7 +601,7 @@ async def test_full_workflow(mock_faiss, kb_manager, mock_embeddings):
         ):
             # Mock text splitter
             with patch(
-                "app.kb.RecursiveCharacterTextSplitter.split_documents",
+                "app.kb.manager.RecursiveCharacterTextSplitter.split_documents",
                 return_value=[Document(page_content="Test", metadata={})],
             ):
                 # Mock FAISS from_documents
