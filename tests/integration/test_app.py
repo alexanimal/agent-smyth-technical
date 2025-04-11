@@ -16,10 +16,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 # Create a patch for the KnowledgeBaseManager before importing the app
 with (
-    patch("app.services.KnowledgeBaseManager") as mock_kb_manager,
-    patch("app.services.ChatHandler") as mock_chat_handler,
+    patch("app.services.initialization.KnowledgeBaseManager") as mock_kb_manager,
+    patch("app.services.initialization.ChatHandler") as mock_chat_handler,
 ):
     # Now import the app after patching
+    # Import services and config here
+    from app import services
+    from app.config import settings
     from app.main import app
 
 # Test client
@@ -49,16 +52,16 @@ def mock_chat_response():
 @pytest.fixture
 def setup_mocks(mock_knowledge_base, mock_chat_response):
     """Setup all necessary mocks."""
-    # Mock the application state in services.py
-    from app import services
+    # Use the get_app_state function to access the app_state
+    app_state = services.get_app_state()
 
-    services.app_state["knowledge_base"] = mock_knowledge_base
-    services.app_state["is_kb_loading"] = False
+    app_state["knowledge_base"] = mock_knowledge_base
+    app_state["is_kb_loading"] = False
 
     # Create a mock chat handler and place it in the app_state
     mock_handler = AsyncMock()
     mock_handler.process_query = AsyncMock(return_value=mock_chat_response)
-    services.app_state["chat_handler"] = mock_handler
+    app_state["chat_handler"] = mock_handler
 
     return mock_handler
 
@@ -89,7 +92,7 @@ def test_chat_endpoint(setup_mocks):
     response = client.post(
         "/chat",
         headers={"User-Agent": "pytest-client", "X-API-Key": TEST_API_KEY},  # Add API key header
-        json={"message": "Test message", "num_results": 3},
+        json={"message": "Test message", "num_results": 3, "generate_alternative_viewpoint": False},
     )
 
     # Check response
@@ -107,7 +110,16 @@ def test_chat_endpoint(setup_mocks):
     assert "metadata" in response_data  # Check metadata structure if needed
 
     # Verify the mock handler in app_state was called correctly
-    setup_mocks.process_query.assert_called_once_with(message="Test message", k=3)
+    from unittest.mock import ANY
+
+    setup_mocks.process_query.assert_called_once_with(
+        message="Test message",
+        k=3,
+        ranking_weights=None,
+        model=ANY,
+        context=ANY,
+        generate_alternative_viewpoint=False,
+    )
 
 
 def test_chat_endpoint_error(setup_mocks):
@@ -139,19 +151,19 @@ async def test_initialize_services_success():
 
     # Patch where these objects are *defined* or *imported* in services.py
     with (
-        patch("app.services.kb_manager", mock_kb_manager_instance),
+        patch("app.services.initialization.kb_manager", mock_kb_manager_instance),
         patch(
-            "app.services.ChatHandler", return_value=mock_chat_handler_instance
+            "app.services.initialization.ChatHandler", return_value=mock_chat_handler_instance
         ) as MockChatHandlerClass,
-        patch("app.services.logger") as mock_logger,
+        patch("app.services.initialization.logger") as mock_logger,
     ):
 
         # Reset the actual app_state before calling
-        from app import services
+        app_state = services.get_app_state()
 
-        services.app_state["knowledge_base"] = None
-        services.app_state["chat_handler"] = None
-        services.app_state["is_kb_loading"] = False
+        app_state["knowledge_base"] = None
+        app_state["chat_handler"] = None
+        app_state["is_kb_loading"] = False
 
         # Run the initialization function
         await services.initialize_services()
@@ -159,12 +171,13 @@ async def test_initialize_services_success():
         # Verify calls and state updates
         mock_kb_manager_instance.load_or_create_kb.assert_called_once()
         MockChatHandlerClass.assert_called_once_with(
-            knowledge_base=mock_kb, model_name=services.settings.model_name
+            knowledge_base=mock_kb, model_name=settings.model_name
         )
         mock_logger.info.assert_called()
-        assert services.app_state["knowledge_base"] == mock_kb
-        assert services.app_state["chat_handler"] == mock_chat_handler_instance
-        assert services.app_state["is_kb_loading"] is False
+        app_state = services.get_app_state()  # Get a fresh reference after initialization
+        assert app_state["knowledge_base"] == mock_kb
+        assert app_state["chat_handler"] == mock_chat_handler_instance
+        assert app_state["is_kb_loading"] is False
 
 
 @pytest.mark.asyncio
@@ -175,34 +188,35 @@ async def test_initialize_services_failure():
     mock_kb_manager_instance.load_or_create_kb = AsyncMock(side_effect=Exception("KB Load Error"))
 
     with (
-        patch("app.services.kb_manager", mock_kb_manager_instance),
-        patch("app.services.logger") as mock_logger,
+        patch("app.services.initialization.kb_manager", mock_kb_manager_instance),
+        patch("app.services.initialization.logger") as mock_logger,
     ):
 
         # Reset state
-        from app import services
+        app_state = services.get_app_state()
 
-        services.app_state["knowledge_base"] = None
-        services.app_state["chat_handler"] = None
-        services.app_state["is_kb_loading"] = False
+        app_state["knowledge_base"] = None
+        app_state["chat_handler"] = None
+        app_state["is_kb_loading"] = False
 
         await services.initialize_services()
 
         # Verify error logging and state reset
         mock_logger.error.assert_called()
-        assert services.app_state["knowledge_base"] is None
-        assert services.app_state["chat_handler"] is None
-        assert services.app_state["is_kb_loading"] is False
+        app_state = services.get_app_state()  # Get a fresh reference after initialization
+        assert app_state["knowledge_base"] is None
+        assert app_state["chat_handler"] is None
+        assert app_state["is_kb_loading"] is False
 
 
 @pytest.mark.asyncio
 async def test_get_current_chat_handler_unavailable():
     """Test the dependency when services are not ready."""
-    from app import services
+    app_state = services.get_app_state()
 
     # Simulate state where loading failed or hasn't finished
-    services.app_state["chat_handler"] = None
-    services.app_state["is_kb_loading"] = False  # Simulate loading failed
+    app_state["chat_handler"] = None
+    app_state["is_kb_loading"] = False  # Simulate loading failed
 
     with pytest.raises(HTTPException) as excinfo:
         await services.get_current_chat_handler()
@@ -211,7 +225,7 @@ async def test_get_current_chat_handler_unavailable():
     assert "failed to initialize" in excinfo.value.detail
 
     # Simulate state where loading is in progress
-    services.app_state["is_kb_loading"] = True
+    app_state["is_kb_loading"] = True
     with pytest.raises(HTTPException) as excinfo:
         await services.get_current_chat_handler()
 

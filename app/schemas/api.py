@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
+from app.schemas.models import OpenAIModel
+
 
 class QueryType(str, Enum):
     """
@@ -49,6 +51,8 @@ class ChatRequest(BaseModel):
         num_results: Number of sources to retrieve and include
         query_type: Optional override for automatic query classification
         verbose: Whether to include detailed source information
+        generate_alternative_viewpoint: Whether to generate an alternative perspective
+        ranking_weights: Optional configuration for ranking document sources
         context: Optional context information for the query
         model: The LLM model to use for processing the query
     """
@@ -61,26 +65,40 @@ class ChatRequest(BaseModel):
         json_schema_extra={"example": "What are investors saying about AAPL?"},
     )
     num_results: int = Field(
-        25,
-        ge=1,
-        le=250,
-        description="Number of sources to retrieve and consider in analysis. Higher values provide more comprehensive analysis but may increase processing time. Recommended ranges: 5-25 for quick queries, 25-100 for detailed analysis, 100-250 for comprehensive market research.",
+        25,  # Default of 25 documents
+        ge=3,  # At least 3 documents for meaningful analysis
+        le=250,  # Upper limit of 100 for performance reasons
+        description="Number of sources to retrieve and consider in analysis. Higher values provide more comprehensive analysis but may increase processing time. Recommended ranges: 3-10 for quick queries, 10-25 for detailed analysis, 25-100 for comprehensive market research.",
     )
     query_type: Optional[QueryType] = Field(
         None, description="Override automatic query classification"
     )
     verbose: bool = Field(False, description="Whether to include detailed source information")
-    # TODO: Add context and model into the request so UIs can swap between models and provide additional context
-    # context: Optional[Dict[str, Any]] = Field(
-    #     default={},
-    #     description="Optional context information for the query",
-    #     json_schema_extra={"example": {"user_location": "US", "platform": "web"}},
-    # )
-    # model: Optional[str] = Field(
-    #     default="gpt-4o",
-    #     description="The model to use for the query",
-    #     json_schema_extra={"example": "gpt-4o"},
-    # )
+    generate_alternative_viewpoint: bool = Field(
+        False, description="Whether to generate an alternative perspective or counter-argument"
+    )
+    ranking_weights: Optional[Dict[str, float]] = Field(
+        None,
+        description="Optional weights for document ranking signals. Keys: recency_weight, view_weight, like_weight, retweet_weight. Values should be between 0 and 1, and ideally sum to 1.",
+        json_schema_extra={
+            "example": {
+                "recency_weight": 0.3,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.3,
+            }
+        },
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional context information for the query",
+        json_schema_extra={"example": {"user_location": "US", "platform": "web"}},
+    )
+    model: Optional[OpenAIModel] = Field(
+        default=None,
+        description="The OpenAI model to use for generating the response. If not specified, the default model will be used.",
+        json_schema_extra={"example": "gpt-3.5-turbo"},
+    )
 
     # Use model_config instead of inner Config class
     model_config = ConfigDict(
@@ -88,8 +106,14 @@ class ChatRequest(BaseModel):
             "example": {
                 "message": "What are the recent trends for AAPL stock?",
                 "num_results": 25,
-                # "context": {"session_id": "user123"},
-                # "model": "gpt-4o",
+                "ranking_weights": {
+                    "recency_weight": 0.3,
+                    "view_weight": 0.2,
+                    "like_weight": 0.2,
+                    "retweet_weight": 0.3,
+                },
+                "context": {"session_id": "user123"},
+                "model": "gpt-3.5-turbo",
             }
         }
     )
@@ -111,6 +135,43 @@ class ChatRequest(BaseModel):
         """
         if len(v.strip()) < 3:
             raise ValueError("Message must contain meaningful content (at least 3 chars)")
+        return v
+
+    @field_validator("ranking_weights")
+    @classmethod
+    def validate_ranking_weights(cls, v: Optional[Dict[str, float]]) -> Optional[Dict[str, float]]:
+        """
+        Validates the ranking weights.
+
+        Args:
+            v: Dictionary of ranking weights
+
+        Returns:
+            Validated ranking weights
+
+        Raises:
+            ValueError: If weights are invalid
+        """
+        if v is None:
+            return v
+
+        valid_keys = {"recency_weight", "view_weight", "like_weight", "retweet_weight"}
+
+        # Validate keys
+        for key in v:
+            if key not in valid_keys:
+                raise ValueError(f"Invalid ranking weight key: {key}. Valid keys are: {valid_keys}")
+
+        # Validate values
+        for key, value in v.items():
+            if not 0 <= value <= 1:
+                raise ValueError(f"Weight for {key} must be between 0 and 1")
+
+        # Check if weights sum to approximately 1
+        weight_sum = sum(v.values())
+        if not 0.98 <= weight_sum <= 1.02:  # Allow small rounding errors
+            raise ValueError(f"Weights should sum to approximately 1, got {weight_sum}")
+
         return v
 
 

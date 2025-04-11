@@ -41,6 +41,13 @@ class TestChatRequest:
             # context={},
             # model="gpt-4o",
             query_type=None,
+            generate_alternative_viewpoint=False,
+            ranking_weights={
+                "recency_weight": 0.4,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            },
         )
 
         assert request.num_results == 5
@@ -48,6 +55,9 @@ class TestChatRequest:
         # assert request.context == {}
         # assert request.model == "gpt-4o"
         assert request.query_type is None
+        assert request.generate_alternative_viewpoint is False
+        assert request.ranking_weights is not None
+        assert request.ranking_weights["recency_weight"] == 0.4
 
     def test_message_validation(self):
         """Test message length validation."""
@@ -59,6 +69,13 @@ class TestChatRequest:
             # context={},
             # model="gpt-4o",
             query_type=None,
+            generate_alternative_viewpoint=False,
+            ranking_weights={
+                "recency_weight": 0.4,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            },
         )
         assert request.message == "Test message"
 
@@ -71,6 +88,13 @@ class TestChatRequest:
                 # context={},
                 # model="gpt-4o",
                 query_type=None,
+                generate_alternative_viewpoint=False,
+                ranking_weights={
+                    "recency_weight": 0.4,
+                    "view_weight": 0.2,
+                    "like_weight": 0.2,
+                    "retweet_weight": 0.2,
+                },
             )
 
     def test_query_type_field(self):
@@ -83,6 +107,13 @@ class TestChatRequest:
             # context={},
             # model="gpt-4o",
             query_type=QueryType.TECHNICAL,
+            generate_alternative_viewpoint=False,
+            ranking_weights={
+                "recency_weight": 0.4,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            },
         )
         assert request.query_type == QueryType.TECHNICAL
 
@@ -94,6 +125,13 @@ class TestChatRequest:
             # context={},
             # model="gpt-4o",
             query_type=None,
+            generate_alternative_viewpoint=False,
+            ranking_weights={
+                "recency_weight": 0.4,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            },
         )
         assert request.query_type is None
 
@@ -102,7 +140,7 @@ class TestChatRequest:
         invalid_value = "invalid_type"
         with pytest.raises(ValidationError):
             # Use a dict to bypass static type checking
-            ChatRequest.parse_obj(
+            ChatRequest.model_validate(
                 {
                     "message": "Test message",
                     "num_results": 5,
@@ -110,6 +148,13 @@ class TestChatRequest:
                     "context": {},
                     "model": "gpt-4o",
                     "query_type": invalid_value,
+                    "generate_alternative_viewpoint": False,
+                    "ranking_weights": {
+                        "recency_weight": 0.4,
+                        "view_weight": 0.2,
+                        "like_weight": 0.2,
+                        "retweet_weight": 0.2,
+                    },
                 }
             )
 

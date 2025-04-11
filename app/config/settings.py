@@ -38,6 +38,8 @@ class Settings(BaseSettings):
         environment (str): Deployment environment (development, staging, production)
         sentry_dsn (str, optional): Sentry DSN for error tracking
         model_name (str): Name of the OpenAI model to use
+        allowed_models (List[str]): List of allowed OpenAI models that can be used
+        default_model (str): Default model to use if none specified
         log_level (str): Logging verbosity level
         mocks_dir_name (str): Directory name for mock data storage
         cors_origins (List[str]): List of allowed origins for CORS
@@ -48,11 +50,26 @@ class Settings(BaseSettings):
     environment: str = Field("development", alias="ENVIRONMENT")
     sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
     model_name: str = Field("gpt-4o", alias="MODEL_NAME")
+    allowed_models: List[str] = Field(
+        default=[
+            "gpt-3.5-turbo",
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-4o",
+        ],
+        alias="ALLOWED_MODELS",
+    )
+    default_model: str = Field("gpt-3.5-turbo", alias="DEFAULT_MODEL")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     mocks_dir_name: str = Field("data", alias="MOCKS_DIR_NAME")
     cors_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:5173"], alias="CORS_ORIGINS"
+        default=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"],
+        alias="CORS_ORIGINS",
     )
+    langsmith_tracing: bool = Field(False, alias="LANGSMITH_TRACING")
+    langsmith_endpoint: str | None = Field(None, alias="LANGSMITH_ENDPOINT")
+    langsmith_api_key: str | None = Field(None, alias="LANGSMITH_API_KEY")
+    langsmith_project: str | None = Field(None, alias="LANGSMITH_PROJECT")
 
     class Config:
         """
@@ -116,6 +133,8 @@ if not settings.openai_api_key:
 # Define project root based on this file's location
 # Assumes config.py is in src directory
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Fix: The PROJECT_ROOT is pointing to the app directory, so go up one more level
+PROJECT_ROOT = os.path.dirname(PROJECT_ROOT)
 MOCKS_DIR_PATH = os.path.join(PROJECT_ROOT, settings.mocks_dir_name)
 
 logger = logging.getLogger(__name__)  # Re-get logger after basicConfig
