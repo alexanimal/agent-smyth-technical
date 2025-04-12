@@ -40,7 +40,7 @@ exec uvicorn app.main:app --host 0.0.0.0 --port 8003\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Expose the correct port
-EXPOSE 8002
+EXPOSE 8003
 
 # Run app
 ENTRYPOINT ["/app/entrypoint.sh"]
