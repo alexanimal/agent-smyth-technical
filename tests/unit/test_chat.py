@@ -1074,7 +1074,7 @@ async def test_process_query_simplified():
             query_type = classification["query_type"]
 
             # This calls as_retriever which we're tracking
-            retriever = handler.knowledge_base.as_retriever(search_kwargs={"k": k * 2})
+            retriever = handler.knowledge_base.as_retriever(search_kwargs={"k": k * 2})  # type: ignore
             docs = await retriever.ainvoke(message)
 
             # Generate a simplified result
