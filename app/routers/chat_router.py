@@ -42,6 +42,8 @@ async def handle_chat(
     - **num_results**: Number of sources to retrieve (default: 25, max: 250).
     - **context**: Optional contextual information.
     - **model**: Optional override for the LLM model.
+    - **generate_alternative_viewpoint**: Whether to generate an alternative viewpoint.
+    - **ranking_weights**: Optional weights for document ranking signals.
 
     Requires a valid API key via `X-API-Key` header in production.
 
@@ -147,6 +149,9 @@ async def stream_chat(
     - **message**: The user's query text (required). Length/content validation applies.
     - **num_results**: Number of sources to retrieve (default: 25, max: 250).
     - **model**: Optional override for the LLM model.
+    - **generate_alternative_viewpoint**: Whether to generate an alternative viewpoint.
+    - **ranking_weights**: Optional weights for document ranking signals.
+    - **context**: Optional contextual information.
 
     The stream contains the following events:
     - **start**: Indicates the start of processing
