@@ -51,7 +51,7 @@ class TestChatHandler:
         assert chat_handler._llm is None
         assert chat_handler._router is None
         assert chat_handler._technical_llm is None
-        assert chat_handler._explorer_llm is None
+        assert chat_handler._model_instances == {}
 
     def test_llm_property(self, chat_handler):
         """Test the lazy-loaded llm property."""
@@ -202,15 +202,26 @@ class TestChatHandler:
 
         # Patch dependencies
         with (
-            patch(
-                "app.core.handler.app_workflow.ainvoke", new_callable=AsyncMock
-            ) as mock_workflow_invoke,
+            patch("app.core.handler.app_workflow.ainvoke") as mock_workflow_invoke,
             patch("app.core.handler.time.time") as mock_time,
+            patch(
+                "app.core.handler.logger"
+            ) as mock_logger,  # Mock the logger to avoid time.time() calls in logging
         ):
-
             # Configure mocks
-            mock_workflow_invoke.return_value = mock_workflow_result
-            mock_time.side_effect = [0.0, 1.0]  # Start and end times
+            # Define an async function to return the mock result
+            async def mock_ainvoke(*args, **kwargs):
+                return mock_workflow_result
+
+            mock_workflow_invoke.side_effect = mock_ainvoke
+
+            # Use a function for time.time to always return increasing values
+            time_values = [0.0, 1.0]
+            mock_time.side_effect = lambda: (
+                time_values[0]
+                if not hasattr(mock_time, "call_count") or mock_time.call_count < 2
+                else time_values[1]
+            )
 
             # Call the method
             result = await chat_handler.process_query(test_query, k=5)

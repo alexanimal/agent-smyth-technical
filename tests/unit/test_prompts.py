@@ -99,13 +99,27 @@ class TestPromptManager:
 
         # Check for key sections in the system message using our helper
         key_sections = [
-            "ANALYSIS PHASE",
-            "THESIS DEVELOPMENT",
-            "BIAS MITIGATION",
-            "SUPPORTING EVIDENCE",
-            "FORMAT",
+            "MARKET VIEW",
+            "CORE CONVICTIONS",
+            "STRATEGIC POSITIONING",
+            "SPECIFIC POSITION RECOMMENDATIONS",
+            "TACTICAL OPPORTUNITIES",
+            "RISK MANAGEMENT",
         ]
         for section in key_sections:
+            assert_message_contains(messages[0], section)
+
+        # Check for position recommendation sections
+        position_sections = ["LONG POSITIONS", "SHORT POSITIONS"]
+        for section in position_sections:
+            assert_message_contains(messages[0], section)
+
+        # Check for formatting guidance
+        formatting_sections = [
+            "FORMAT YOUR RESPONSE FOR REACT-MARKDOWN COMPATIBILITY",
+            "IMPORTANT RENDERING CONSIDERATIONS",
+        ]
+        for section in formatting_sections:
             assert_message_contains(messages[0], section)
 
         # Check input variables

@@ -5,7 +5,15 @@ Unit tests for schema classes and enums.
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import ChatRequest, ChatResponse, HealthStatus, QueryType, RootResponse
+from app.schemas import (
+    ChatRequest,
+    ChatResponse,
+    HealthStatus,
+    ModelSelectionRequest,
+    OpenAIModel,
+    QueryType,
+    RootResponse,
+)
 
 
 class TestQueryType:
@@ -157,6 +165,42 @@ class TestChatRequest:
                     },
                 }
             )
+
+
+class TestOpenAIModel:
+    """Test OpenAIModel enum and validation methods."""
+
+    def test_is_valid(self):
+        """Test the is_valid method."""
+        assert OpenAIModel.is_valid("gpt-3.5-turbo") is True
+        assert OpenAIModel.is_valid("gpt-4") is True
+        assert OpenAIModel.is_valid("gpt-4-turbo") is True
+        assert OpenAIModel.is_valid("gpt-100") is False
+        assert OpenAIModel.is_valid("") is False
+
+    def test_get_default(self):
+        """Test the get_default method."""
+        assert OpenAIModel.get_default() == "gpt-3.5-turbo"
+
+
+class TestModelSelectionRequest:
+    """Test ModelSelectionRequest schema."""
+
+    def test_defaults(self):
+        """Test default values."""
+        request = ModelSelectionRequest()
+        assert request.model is None
+
+    def test_with_valid_enum(self):
+        """Test instantiation with valid enum values."""
+        request = ModelSelectionRequest(model=OpenAIModel.GPT_4_TURBO)
+        assert request.model == "gpt-4-turbo"
+
+    def test_model_serialization(self):
+        """Test model serialization."""
+        request = ModelSelectionRequest(model=OpenAIModel.GPT_4)
+        json_data = request.model_dump()
+        assert json_data["model"] == "gpt-4"
 
 
 if __name__ == "__main__":

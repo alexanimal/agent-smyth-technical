@@ -50,6 +50,11 @@ def ensure_string_content(message_or_string: Any) -> Any:
     if isinstance(message_or_string, (dict, list)):
         return message_or_string
 
+    # Handle bytes by decoding to string
+    if isinstance(message_or_string, bytes):
+        logger.debug(f"Converting bytes to string")
+        return message_or_string.decode("utf-8")
+
     # For everything else, ensure it's a string
     if message_or_string is not None and not isinstance(message_or_string, str):
         logger.debug(f"Converting {type(message_or_string)} to string")
@@ -181,6 +186,11 @@ async def retrieve_documents_node(state: RAGState) -> RAGState:
 
     # Use user-provided num_results with reasonable constraints
     user_k = state["num_results"]
+
+    # If user requests 0 results, return empty list immediately
+    if user_k <= 0:
+        state["retrieved_docs"] = []
+        return state
 
     # Apply query-type-based adjustments but respect user preferences
     base_k = user_k
@@ -336,64 +346,54 @@ async def rank_documents_node(state: RAGState) -> RAGState:
 
 async def generate_response_node(state: RAGState) -> RAGState:
     """
-    Node to generate a response based on ranked documents.
-
-    This node generates a response to the user's query based on the ranked
-    documents, using the appropriate prompt template and model based on the
-    query type.
+    Node to generate a response based on retrieved documents and the user's query.
 
     Args:
         state: The current workflow state
 
     Returns:
-        Updated workflow state with generated response and sources
+        Updated workflow state with response and sources
     """
-    query = state["query"]
-    docs = state["ranked_docs"]
-    classification = state["classification"]
-
-    # Get model name from state
-    model_name = state.get("model", settings.default_model)
-    logger.info(f"Generating response using model: {model_name}")
-
+    # Initialize variables to avoid UnboundLocalError in exception handling
+    generation_time = None
     start_time = time.time()
 
-    if not docs:
-        state["response"] = "I couldn't find any relevant information."
-        state["sources"] = []
-        metrics = ensure_generation_metrics(state)
-        metrics["model"] = model_name
-        metrics["generation_time"] = 0
-        metrics["document_count"] = 0
-        return state
-
-    # Extract document content and build context string
-    context_string = "\n\n---\n\n".join([doc.page_content for doc in docs])
-
-    # Add technical data for certain query types
-    query_type = classification["query_type"]
-    if query_type in ["trading_thesis", "technical"]:
-        # This would call the full _get_technical_indicators method
-        # Simplified placeholder
-        technical_data = "Technical Indicator Data:\n(Technical indicators would be extracted here)"
-        context_string += f"\n\n{technical_data}"
-
-    # Choose prompt template based on query type
-    prompt_templates = {
-        "investment": PromptManager.get_investment_prompt(),
-        "trading_thesis": PromptManager.get_trading_thesis_prompt(),
-        "technical": PromptManager.get_technical_analysis_prompt(),
-        "general": PromptManager.get_general_prompt(),
-    }
-    prompt_template = prompt_templates.get(query_type, PromptManager.get_general_prompt())
-
-    # Build inputs for the prompt
-    inputs = RunnableParallel(
-        context=RunnableLambda(lambda x: context_string),
-        question=RunnablePassthrough(),
-    )
-
     try:
+        query = state["query"]
+        docs = state["ranked_docs"]
+        metrics = ensure_generation_metrics(state)
+
+        # Handle empty docs gracefully
+        if not docs or len(docs) == 0:
+            state["response"] = "I couldn't find any relevant information to answer your question."
+            state["sources"] = []
+            return state
+
+        # Get model name from state
+        model_name = state.get("model", settings.default_model)
+
+        # Build context string (joining all document content)
+        context_string = "\n\n---\n\n".join([doc.page_content for doc in docs])
+
+        # Get classification from state
+        classification = state.get("classification", {})
+        query_type = classification.get("query_type", "general")
+
+        # Choose prompt template based on query type
+        prompt_templates = {
+            "investment": PromptManager.get_investment_prompt(),
+            "trading_thesis": PromptManager.get_trading_thesis_prompt(),
+            "technical": PromptManager.get_technical_analysis_prompt(),
+            "general": PromptManager.get_general_prompt(),
+        }
+        prompt_template = prompt_templates.get(query_type, PromptManager.get_general_prompt())
+
+        # Build inputs for the prompt
+        inputs = RunnableParallel(
+            context=RunnableLambda(lambda x: context_string),
+            question=RunnablePassthrough(),
+        )
+
         # Use generate_with_fallback for robust generation with retries
         prompt_inputs = await inputs.ainvoke(query)
         prompt_messages = await prompt_template.ainvoke(prompt_inputs)
@@ -435,7 +435,6 @@ async def generate_response_node(state: RAGState) -> RAGState:
             response_length = 0
 
         # Record metrics for monitoring and tracking
-        metrics = ensure_generation_metrics(state)
         metrics["model"] = model_name
         metrics["generation_time"] = generation_time
         metrics["document_count"] = len(docs)
@@ -447,6 +446,7 @@ async def generate_response_node(state: RAGState) -> RAGState:
         state["sources"] = list(set(sources))  # Deduplicate sources
 
     except Exception as e:
+        generation_time = time.time() - start_time
         logger.error(f"Error generating response: {str(e)}", exc_info=True)
         state["response"] = (
             "I'm sorry, I encountered an error while generating a response. Please try again."

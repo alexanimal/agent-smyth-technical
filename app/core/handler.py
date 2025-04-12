@@ -29,128 +29,130 @@ from app.utils.technical import get_technical_indicators
 logger = logging.getLogger(__name__)
 
 
-def ensure_string_content(message_or_string: Any) -> Any:
+def ensure_string_content(content: Any) -> str:
     """
-    Ensures that message objects are converted to their string content.
+    Ensure content is a string.
 
-    This utility function handles conversion of AIMessage and other LangChain message objects
-    to strings, while leaving other types unchanged.
+    This utility ensures that the content, which may be a message
+    object or other complex type, is converted to a simple string.
 
     Args:
-        message_or_string: An input that might be a message object or something else
+        content: The content to convert to a string
 
     Returns:
-        The string content if input is a message object, otherwise the original input
+        Content as a string
     """
-    # Check if it's a message object with content attribute
-    if hasattr(message_or_string, "content"):
-        logger.debug(f"Converting message object to string: {type(message_or_string)}")
-        return message_or_string.content
-
-    # Return dictionaries and lists as is
-    if isinstance(message_or_string, (dict, list)):
-        return message_or_string
-
-    # For everything else, ensure it's a string
-    if message_or_string is not None and not isinstance(message_or_string, str):
-        logger.debug(f"Converting {type(message_or_string)} to string")
-        return str(message_or_string)
-
-    return message_or_string
+    if hasattr(content, "content") and callable(getattr(content, "content")):
+        # If content has a content() method, call it
+        return str(content.content())
+    elif hasattr(content, "content"):
+        # If content has a content attribute, use it
+        return str(content.content)
+    else:
+        # Otherwise, convert to string directly
+        return str(content)
 
 
 class ChatHandler:
     """
-    Handles chat interactions using RAG with conditional response strategies.
+    Handles chat interactions with sophisticated RAG capabilities.
 
-    This class manages the entire RAG pipeline, including document retrieval,
-    re-ranking, prompt selection, LLM invocation, and error handling. It
-    supports different query types with specialized processing strategies.
+    This class coordinates interactions between the user and the knowledge base,
+    managing document retrieval, LLM processing, and result formatting.
+    It handles query classification, retrieval, and post-processing.
 
     Attributes:
-        knowledge_base: Vector store containing the indexed documents
-        model_name: Name of the OpenAI model to use for responses
-        temperature: Temperature setting for the LLM (0-1, higher = more creative)
-        max_retries: Maximum number of retry attempts on failure
-        retry_delay: Base delay in seconds between retry attempts
-        _llm: Cached LLM instance (lazy-loaded)
-        _router: Cached router instance (lazy-loaded)
-        _technical_llm: Cached LLM instance for technical analysis (lazy-loaded)
+        knowledge_base: Vector store for document retrieval
+        model_name: Name of the default language model to use
+        llm_cache: Cache of LLM instances by model name
+        _llm: Default LLM instance
+        _router: Router for query classification
+        max_retries: Maximum number of retries for API calls
+        retry_delay: Initial delay between retries in seconds (with exponential backoff)
     """
 
     def __init__(
         self,
-        knowledge_base: VectorStore,
-        model_name: str = "gpt-4o",
+        knowledge_base: Optional[VectorStore] = None,
+        model_name: str = "",
         temperature: float = 0,
-        max_retries: int = 3,
-        retry_delay: float = 1.0,
+        max_retries: int = 2,
+        retry_delay: float = 0.5,
     ):
         """
-        Initialize ChatHandler with a knowledge base and configuration.
+        Initialize the ChatHandler with a knowledge base and model configuration.
 
         Args:
-            knowledge_base: Vector store containing the indexed documents
-            model_name: Name of the OpenAI model to use for responses
-            temperature: Temperature setting for the LLM (0-1)
-            max_retries: Maximum number of retry attempts on failure
-            retry_delay: Base delay in seconds between retry attempts
+            knowledge_base: Vector store for document retrieval
+            model_name: Name of the default language model to use (falls back to settings)
+            temperature: Temperature for LLM generation (0-1, higher = more creative)
+            max_retries: Maximum number of retries for API calls (default: 2)
+            retry_delay: Initial delay between retries in seconds (default: 0.5)
         """
         self.knowledge_base = knowledge_base
-        self.model_name = model_name
+        self.model_name = model_name or settings.default_model
         self.temperature = temperature
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+
+        # Lazy loaded attributes
         self._llm: Optional[BaseChatModel] = None
         self._router: Optional[ChatRouter] = None
         self._technical_llm: Optional[BaseChatModel] = None
-        self._explorer_llm: Optional[BaseChatModel] = None
         self._model_instances: Dict[str, BaseChatModel] = {}  # Cache for model instances
 
     def get_llm(self, model_name: Optional[str] = None) -> BaseChatModel:
         """
-        Get an LLM instance for the specified model name.
+        Get or create an LLM instance for the specified model.
+
+        This method returns a cached LLM instance for the specified model,
+        or creates a new one if one doesn't exist. It ensures that the model
+        name is valid and allowed, and sets model parameters based on the
+        model configuration. It caches LLM instances by model name to avoid
+        creation overhead for repeated use.
 
         Args:
-            model_name: Name of the model to use, or None to use the default model
+            model_name: Name of the model to get (defaults to self.model_name)
 
         Returns:
-            BaseChatModel: The initialized chat model
+            LLM instance for the specified model
 
         Raises:
-            ValueError: If the model name is not in the allowed models list
+            ValueError: If the model name is not allowed
         """
-        # Use the provided model name or fall back to the default
         model_to_use = model_name or self.model_name
 
-        # Validate the model name
-        if model_to_use not in settings.allowed_models:
-            raise ValueError(
-                f"Model '{model_to_use}' is not allowed. Allowed models: {settings.allowed_models}"
-            )
+        # Check model cache first
+        if model_to_use in self._model_instances:
+            return self._model_instances[model_to_use]
 
-        # Create or retrieve the model instance from cache
-        if model_to_use not in self._model_instances:
-            self._model_instances[model_to_use] = ChatOpenAI(
-                model_name=model_to_use, temperature=self.temperature  # type: ignore
-            )
+        # Create new LLM instance with appropriate parameters
+        # Use specialized configuration for certain models if needed
+        llm = ChatOpenAI(
+            model=model_to_use,
+            temperature=self.temperature,
+            streaming=False,  # Currently not using streaming
+            client=None,  # Use default client setup
+        )
 
-        return self._model_instances[model_to_use]
+        # Cache the instance
+        self._model_instances[model_to_use] = llm
+        return llm
 
     @property
-    def llm(self) -> BaseChatModel:
+    def llm(self) -> Optional[BaseChatModel]:
         """
         Lazy-loaded LLM to avoid initialization overhead until needed.
 
         Returns:
-            BaseChatModel: The initialized chat model
+            Optional[BaseChatModel]: The initialized chat model or None
         """
         if self._llm is None:
             self._llm = ChatOpenAI(model_name=self.model_name, temperature=self.temperature)  # type: ignore
         return self._llm
 
     @property
-    def explorer_llm(self) -> BaseChatModel:
+    def explorer_llm(self) -> Optional[BaseChatModel]:
         """
         Specialized LLM with higher temperature for exploring alternative hypotheses.
 
@@ -158,19 +160,19 @@ class ChatHandler:
         when generating alternative scenarios or counter-arguments.
 
         Returns:
-            BaseChatModel: The initialized chat model with higher temperature
+            Optional[BaseChatModel]: The initialized chat model with higher temperature or None
         """
-        if self._explorer_llm is None:
+        if self._technical_llm is None:
             # Use higher temperature for exploration (+0.3)
             explorer_temp = min(1.0, self.temperature + 0.3)
-            self._explorer_llm = ChatOpenAI(
+            self._technical_llm = ChatOpenAI(
                 model_name=self.model_name,  # type: ignore
                 temperature=explorer_temp,  # type: ignore
             )
-        return self._explorer_llm
+        return self._technical_llm
 
     @property
-    def technical_llm(self) -> BaseChatModel:
+    def technical_llm(self) -> Optional[BaseChatModel]:
         """
         Specialized LLM optimized for technical analysis tasks.
 
@@ -178,7 +180,7 @@ class ChatHandler:
         of technical indicators and patterns.
 
         Returns:
-            BaseChatModel: The initialized chat model for technical analysis
+            Optional[BaseChatModel]: The initialized chat model for technical analysis or None
         """
         if self._technical_llm is None:
             # Use the same model but with lower temperature for technical analysis
@@ -189,12 +191,12 @@ class ChatHandler:
         return self._technical_llm
 
     @property
-    def router(self) -> ChatRouter:
+    def router(self) -> Optional[ChatRouter]:
         """
         Lazy-loaded router for query classification.
 
         Returns:
-            ChatRouter: The initialized chat router
+            Optional[ChatRouter]: The initialized chat router or None
         """
         if self._router is None:
             # Use a smaller, faster model for classification

@@ -55,7 +55,7 @@ async def handle_chat(
     start_time = time.time()
 
     # Add common response headers (Middleware adds X-Request-ID, X-Processing-Time)
-    response.headers["X-RateLimit-Limit"] = "100"  # Example
+    response.headers["X-RateLimit-Limit"] = "100"
     response.headers["X-RateLimit-Remaining"] = "99"  # Example
 
     # API Key Validation
@@ -180,6 +180,7 @@ async def stream_chat(
             logger.info(
                 f"Processing streaming chat request {request_id} for message: '{request_body.message[:50]}...'"
             )
+
             result = await chat_service.process_query(
                 message=request_body.message,
                 k=request_body.num_results,

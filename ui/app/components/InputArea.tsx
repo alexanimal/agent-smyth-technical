@@ -3,7 +3,7 @@ import { useChatWithMetadata } from '../hooks/useChatWithMetadata'
 import { useSettingsStore } from '../store/settingsStore'
 
 // Define the maximum character limit
-const MAX_CHAR_LIMIT = 2000
+const MAX_CHAR_LIMIT = 50000
 const WARNING_THRESHOLD = 0.8 // 80% of max chars
 
 /**
@@ -47,7 +47,7 @@ export const InputArea: React.FC = () => {
     const resizeTextarea = () => {
       if (textareaRef.current) {
         textareaRef.current.style.height = 'inherit'
-        const newHeight = Math.min(textareaRef.current.scrollHeight, 200)
+        const newHeight = Math.min(textareaRef.current.scrollHeight, 500)
         textareaRef.current.style.height = `${newHeight}px`
       }
     }
