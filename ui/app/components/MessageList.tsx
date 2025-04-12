@@ -61,6 +61,9 @@ export const MessageList: React.FC = () => {
         <div className="text-center py-8 animate-fade-in">
           <h2 className="text-lg font-medium mb-2">Welcome to the Chat!</h2>
           <p className="text-gray-500 dark:text-gray-400">
+            Ensure the local server is running at http://localhost:8003.
+          </p>
+          <p className="text-gray-500 dark:text-gray-400">
             Send a message to start a conversation.
           </p>
         </div>

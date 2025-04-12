@@ -26,7 +26,7 @@ const ChatContainer: React.FC = () => {
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-950" data-testid="chat-container">
       <header className="bg-white dark:bg-gray-900 dark:text-white border-b dark:border-gray-700 p-4 flex justify-between items-center">
         <div className="flex items-center">
-          <h1 className="text-xl font-bold">Chat Application</h1>
+          <h1 className="text-xl font-bold">AI Financial Advisor</h1>
           <div className="ml-3 text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
             {currentApiType === 'stream' ? 'Streaming' : 'Regular'} · {currentModel}
           </div>

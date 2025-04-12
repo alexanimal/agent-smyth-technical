@@ -92,8 +92,8 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
 
       <div className={`flex mb-4 ${streamingAnimationClass}`}>
         <Avatar isAnimated={isStreaming} />
-        <div className="ml-3 flex flex-col w-full max-w-[80%] sm:max-w-[85%] md:max-w-[80%] lg:max-w-[80%]">
-          <div className={`bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-md hover:shadow-lg transition-shadow duration-300 markdown-content message-content-large text-justify`}>
+        <div className="ml-3 flex flex-col max-w-[80%] sm:max-w-[85%] md:max-w-[80%] lg:max-w-[80%]">
+          <div className={`w-fit bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-md hover:shadow-lg transition-shadow duration-300 markdown-content message-content-large text-left`}>
             {/* Streaming indicator */}
             {isStreaming && (
               <div className="flex items-center mb-2 text-blue-500 text-xs font-medium">
@@ -145,15 +145,15 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
                   );
                 },
                 // Enhance other markdown elements
-                p: ({ children }) => <p className="my-2 text-sm text-justify leading-relaxed">{children}</p>,
-                h1: ({ children }) => <h1 className="text-xl font-bold my-3 border-b pb-1 border-gray-200 dark:border-gray-700">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-lg font-bold my-2 text-gray-800 dark:text-gray-200">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-md font-semibold my-2 text-gray-800 dark:text-gray-200">{children}</h3>,
-                ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
-                li: ({ children }) => <li className="my-1 text-sm">{children}</li>,
+                p: ({ children }) => <p className="my-2 text-sm text-left leading-relaxed">{children}</p>,
+                h1: ({ children }) => <h1 className="text-xl font-bold my-3 border-b pb-1 border-gray-200 dark:border-gray-700 text-left">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-lg font-bold my-2 text-gray-800 dark:text-gray-200 text-left">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-md font-semibold my-2 text-gray-800 dark:text-gray-200 text-left">{children}</h3>,
+                ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1 text-left">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1 text-left">{children}</ol>,
+                li: ({ children }) => <li className="my-1 text-sm text-left">{children}</li>,
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-3 italic my-3 text-gray-700 dark:text-gray-300">{children}</blockquote>
+                  <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-3 italic my-3 text-gray-700 dark:text-gray-300 text-left">{children}</blockquote>
                 ),
                 // Add custom styling for tables
                 table: ({ children }) => (
@@ -176,7 +176,7 @@ export const MessageWithViewpoints: React.FC<MessageWithViewpointsProps> = ({
                   </th>
                 ),
                 td: ({ children }) => (
-                  <td className="px-3 py-2 text-sm">{children}</td>
+                  <td className="px-3 py-2 text-sm text-left">{children}</td>
                 ),
               }}
             >

@@ -11,6 +11,8 @@ export default function InputContainer() {
     const [showSettings, setShowSettings] = useState(false);
     const settingsRef = useRef<HTMLDivElement>(null);
     const sliderRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const dispatch = useDispatch();
 
     // Handle clicking outside settings menu to close it
@@ -30,6 +32,21 @@ export default function InputContainer() {
     useEffect(() => {
         updateSliderProgress();
     }, [numResults]);
+
+    // Auto-focus the input field
+    useEffect(() => {
+        if (isExpanded && textareaRef.current) {
+            textareaRef.current.focus();
+            // Set cursor at the end of text
+            const length = textareaRef.current.value.length;
+            textareaRef.current.setSelectionRange(length, length);
+        } else if (!isExpanded && inputRef.current) {
+            inputRef.current.focus();
+            // Set cursor at the end of text
+            const length = inputRef.current.value.length;
+            inputRef.current.setSelectionRange(length, length);
+        }
+    }, [isExpanded]);
 
     const updateSliderProgress = () => {
         if (sliderRef.current) {
@@ -54,19 +71,40 @@ export default function InputContainer() {
 
     const sendMessageToAgent = async (message: string) => {
         dispatch(messageLoading(true));
-        const resp = await fetch('http://localhost:8003/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': '1234567890'
-            },
-            body: JSON.stringify({ message, "num_results": numResults })
-        })
-        const respJson = await resp.json();
-        console.log(respJson);
+        try {
+            const resp = await fetch('http://localhost:8003/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': '1234567890'
+                },
+                body: JSON.stringify({ message, "num_results": numResults })
+            });
 
-        dispatch(addMessage({ message: respJson.response.toString(), id: v4(), createdAt: new Date().toISOString(), isUser: false }));
-        dispatch(messageLoading(false));
+            if (!resp.ok) {
+                throw new Error(`Server responded with status: ${resp.status}`);
+            }
+
+            const respJson = await resp.json();
+            console.log(respJson);
+
+            dispatch(addMessage({
+                message: respJson.response.toString(),
+                id: v4(),
+                createdAt: new Date().toISOString(),
+                isUser: false
+            }));
+        } catch (error) {
+            console.error('Error sending message:', error);
+            dispatch(addMessage({
+                message: 'Error: Could not connect to the server. Please make sure the backend is running.',
+                id: v4(),
+                createdAt: new Date().toISOString(),
+                isUser: false
+            }));
+        } finally {
+            dispatch(messageLoading(false));
+        }
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -76,36 +114,68 @@ export default function InputContainer() {
     const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = Number(e.target.value);
         setNumResults(value);
-
         // Update progress is now handled by the useEffect
+    }
+
+    const toggleExpand = () => {
+        setIsExpanded(!isExpanded);
     }
 
     return (
         <div className="flex items-center justify-center p-4">
             <div className="relative w-full max-w-full">
                 { isExpanded ? (
-                <textarea
-                    value={inputMessage}
-                    onChange={handleInputChange}
-                    className="input-field w-full max-w-5xl px-4 py-2 h-24 rounded-sm border-2 border-transparent focus:border-blue-500 bg-gray-800 text-white placeholder:text-gray-400 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-600 hover:scale-105 duration-300 ease-in-out"
-                    placeholder="Type your message here..."
-                    disabled={disabled}
-                />
+                <div className="flex flex-col w-full">
+                    <textarea
+                        ref={textareaRef}
+                        value={inputMessage}
+                        onChange={handleInputChange}
+                        className="input-field w-full max-w-5xl px-4 py-3 h-24 rounded-lg border-2 border-transparent focus:border-blue-500 bg-gray-800 text-white placeholder:text-gray-400 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-300"
+                        placeholder="Type your message here..."
+                        disabled={disabled}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage(inputMessage);
+                            }
+                        }}
+                    />
+                    <div className="text-xs text-gray-400 mt-1 ml-2">
+                        Press Shift+Enter for new line, Enter to send
+                    </div>
+                </div>
             ) : (
                 <input
-                type={'text'}
-                value={inputMessage}
-                onChange={handleInputChange}
-                className="input-field w-full max-w-3xl px-4 py-3 rounded-full border-2 border-transparent focus:border-blue-500 bg-gray-800 text-white placeholder:text-gray-400 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-600 hover:scale-105 duration-300 ease-in-out"
-                placeholder="Type your message here..."
-                disabled={disabled}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        handleSendMessage(inputMessage);
-                    }
-                }}
-            />)}
+                    ref={inputRef}
+                    type="text"
+                    value={inputMessage}
+                    onChange={handleInputChange}
+                    className="input-field w-full max-w-3xl px-4 py-3 rounded-full border-2 border-transparent focus:border-blue-500 bg-gray-800 text-white placeholder:text-gray-400 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-300"
+                    placeholder="Type your message here..."
+                    disabled={disabled}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            handleSendMessage(inputMessage);
+                        }
+                    }}
+                />
+            )}
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex space-x-2">
+                <button
+                    type="button"
+                    onClick={toggleExpand}
+                    className="flex items-center justify-center bg-gray-700 text-white rounded-full h-10 w-10 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out hover:bg-gray-600 mr-2"
+                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        {isExpanded ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                        ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"></path>
+                        )}
+                    </svg>
+                </button>
+
                 <div ref={settingsRef} className="relative">
                     <button
                         type="button"

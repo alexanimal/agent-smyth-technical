@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import SourceChip from './SourceChip';
 
 interface CollapsibleSourcesProps {
   sources: string[];
@@ -7,11 +8,19 @@ interface CollapsibleSourcesProps {
 /**
  * CollapsibleSources component displays an expandable list of citation sources.
  * It allows hiding/showing sources to keep the UI clean while providing access to references.
+ * Now uses a chip-based design for more compact and visually appealing display.
+ * Includes mobile-friendly features like limiting initial display and filtering.
  */
 export const CollapsibleSources: React.FC<CollapsibleSourcesProps> = ({ sources }) => {
   const [isOpen, setIsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number>(0);
+  const [expandedSource, setExpandedSource] = useState<string | null>(null);
+  const [showAllSources, setShowAllSources] = useState(false);
+  const [filter, setFilter] = useState('');
+
+  // Number of sources to show initially (more sources can be revealed with "Show more" button)
+  const initialVisibleCount = 10;
 
   // Toggle the open/closed state
   const toggle = () => setIsOpen(!isOpen);
@@ -21,10 +30,52 @@ export const CollapsibleSources: React.FC<CollapsibleSourcesProps> = ({ sources 
     if (contentRef.current) {
       setContentHeight(isOpen ? contentRef.current.scrollHeight : 0);
     }
-  }, [isOpen, sources]);
+  }, [isOpen, sources, expandedSource, showAllSources, filter]);
 
   // Don't render anything if there are no sources
   if (!sources || sources.length === 0) return null;
+
+  // Function to parse and format source URL for display
+  const parseSourceUrl = (source: string): { displayUrl: string, url: string } => {
+    let displayUrl = '';
+    let url = source;
+
+    try {
+      const parsedUrl = new URL(source);
+      // Handle Twitter/X URLs specially
+      if (parsedUrl.hostname === 'x.com' || parsedUrl.hostname.includes('twitter')) {
+        const pathParts = parsedUrl.pathname.split('/');
+        const username = pathParts[1];
+        displayUrl = `@${username}`;
+      } else {
+        displayUrl = parsedUrl.hostname.replace('www.', '');
+      }
+    } catch (e) {
+      displayUrl = source; // Fall back to the raw source if URL parsing fails
+    }
+
+    return { displayUrl, url };
+  };
+
+  // Filter sources based on search input
+  const filteredSources = filter
+    ? sources.filter(source => {
+        try {
+          const url = new URL(source);
+          return url.hostname.toLowerCase().includes(filter.toLowerCase()) ||
+                 url.pathname.toLowerCase().includes(filter.toLowerCase());
+        } catch {
+          return source.toLowerCase().includes(filter.toLowerCase());
+        }
+      })
+    : sources;
+
+  // Decide how many sources to display based on showAllSources state
+  const displayedSources = showAllSources
+    ? filteredSources
+    : filteredSources.slice(0, initialVisibleCount);
+
+  const hasMoreSources = filteredSources.length > initialVisibleCount;
 
   return (
     <div className="sources-container mt-4 border-t border-gray-200 dark:border-gray-700">
@@ -47,38 +98,71 @@ export const CollapsibleSources: React.FC<CollapsibleSourcesProps> = ({ sources 
         style={{ height: `${contentHeight}px` }}
         aria-hidden={!isOpen}
       >
-        <ol className="sources-list px-6 py-3 text-sm text-gray-600 dark:text-gray-300 space-y-2">
-          {sources.map((source, index) => {
-            // Parse URL to display in a more readable format
-            let displayUrl = '';
-            try {
-              const url = new URL(source);
-              // Handle Twitter/X URLs specially
-              if (url.hostname === 'x.com') {
-                const pathParts = url.pathname.split('/');
-                const username = pathParts[1];
-                displayUrl = `@${username} on Twitter (X)`;
-              } else {
-                displayUrl = url.hostname.replace('www.', '');
-              }
-            } catch (e) {
-              displayUrl = source; // Fall back to the raw source if URL parsing fails
-            }
+        <div className="p-4">
+          {/* Search filter for many sources */}
+          {sources.length > 15 && (
+            <div className="mb-3">
+              <input
+                type="text"
+                placeholder="Filter sources..."
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                aria-label="Filter sources"
+              />
+            </div>
+          )}
 
-            return (
-              <li key={index} className="source-item">
-                <a
-                  href={source}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-blue-500 transition-colors duration-200"
-                >
-                  [{index + 1}] {displayUrl}
-                </a>
-              </li>
-            );
-          })}
-        </ol>
+          {/* Source chips grid layout */}
+          <div className="flex flex-wrap gap-1">
+            {displayedSources.map((source, index) => {
+              const { displayUrl, url } = parseSourceUrl(source);
+              return (
+                <SourceChip
+                  key={index}
+                  index={index + 1}
+                  url={url}
+                  displayText={displayUrl}
+                  onClick={() => setExpandedSource(expandedSource === source ? null : source)}
+                />
+              );
+            })}
+          </div>
+
+          {/* Show more/less button for many sources */}
+          {hasMoreSources && (
+            <button
+              onClick={() => setShowAllSources(!showAllSources)}
+              className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+            >
+              {showAllSources
+                ? "Show fewer sources"
+                : `Show ${filteredSources.length - initialVisibleCount} more sources`}
+            </button>
+          )}
+
+          {/* No results message when filter returns empty */}
+          {filter && filteredSources.length === 0 && (
+            <div className="my-3 text-sm text-gray-500 dark:text-gray-400">
+              No sources match your filter.
+            </div>
+          )}
+
+          {/* Display expanded source details when a chip is clicked */}
+          {expandedSource && (
+            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-sm">
+              <div className="font-medium mb-1">Source details:</div>
+              <a
+                href={expandedSource}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              >
+                {expandedSource}
+              </a>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

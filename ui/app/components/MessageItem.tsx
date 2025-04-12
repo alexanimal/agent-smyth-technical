@@ -71,7 +71,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return (
       <div className="flex justify-center my-4 animate-fade-in">
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded shadow-md max-w-lg">
-          <p className="text-sm">{content}</p>
+          <p className="text-sm text-left">{content}</p>
         </div>
       </div>
     );
@@ -83,8 +83,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       <div className="flex flex-col items-end mb-4 animate-fade-in">
         <div className="flex items-end">
           <div className="order-2 mx-2 flex flex-col items-end">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl px-4 py-2 max-w-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <p className="text-sm whitespace-pre-wrap">{content}</p>
+            <div className="w-fit bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl px-4 py-2 max-w-lg shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <p className="text-sm whitespace-pre-wrap text-left break-words">{content}</p>
             </div>
             {timestamp && (
               <span className="text-xs text-gray-500 mt-1 mr-2">{formattedTime}</span>
@@ -131,8 +131,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   return (
     <div className={`flex mb-4 transition-all duration-300 ease-in-out`}>
       <Avatar isAnimated={isStreaming} />
-      <div className="ml-3 flex flex-col w-full max-w-[80%] sm:max-w-[85%] md:max-w-[80%] lg:max-w-[80%]">
-        <div className={`bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-md hover:shadow-lg transition-shadow duration-300 markdown-content message-content-large text-justify ${streamingAnimationClass}`}>
+      <div className="ml-3 flex flex-col max-w-[80%] sm:max-w-[85%] md:max-w-[80%] lg:max-w-[80%]">
+        <div className={`w-fit bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-md hover:shadow-lg transition-shadow duration-300 markdown-content message-content-large text-left break-words ${streamingAnimationClass}`}>
           {/* Streaming indicator */}
           {isStreaming && (
             <div className="flex items-center mb-2 text-blue-500 text-xs font-medium">
@@ -184,15 +184,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 );
               },
               // Enhance other markdown elements
-              p: ({ children }) => <p className="my-2 text-sm text-justify leading-relaxed">{children}</p>,
-              h1: ({ children }) => <h1 className="text-xl font-bold my-3 border-b pb-1 border-gray-200 dark:border-gray-700">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-lg font-bold my-2 text-gray-800 dark:text-gray-200">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-md font-semibold my-2 text-gray-800 dark:text-gray-200">{children}</h3>,
-              ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
-              li: ({ children }) => <li className="my-1 text-sm">{children}</li>,
+              p: ({ children }) => <p className="my-2 text-sm text-left leading-relaxed">{children}</p>,
+              h1: ({ children }) => <h1 className="text-xl font-bold my-3 border-b pb-1 border-gray-200 dark:border-gray-700 text-left">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-lg font-bold my-2 text-gray-800 dark:text-gray-200 text-left">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-md font-semibold my-2 text-gray-800 dark:text-gray-200 text-left">{children}</h3>,
+              ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1 text-left">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1 text-left">{children}</ol>,
+              li: ({ children }) => <li className="my-1 text-sm text-left">{children}</li>,
               blockquote: ({ children }) => (
-                <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-3 italic my-3 text-gray-700 dark:text-gray-300">{children}</blockquote>
+                <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-3 italic my-3 text-gray-700 dark:text-gray-300 text-left">{children}</blockquote>
               ),
               a: ({ href, children }) => (
                 <a
@@ -233,7 +233,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 </th>
               ),
               td: ({ children }) => (
-                <td className="px-3 py-2 text-sm">{children}</td>
+                <td className="px-3 py-2 text-sm text-left">{children}</td>
               ),
             }}
           >

@@ -10,4 +10,23 @@ export default defineConfig({
     react(),
     tsconfigPaths()
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'markdown': ['react-markdown', 'react-syntax-highlighter'],
+          'ui-components': [
+            // UI component paths will go here
+          ],
+          'message-core': [
+            // Message related component paths
+          ],
+          'message-advanced': [
+            // Advanced message components with viewpoints
+          ]
+        }
+      }
+    }
+  }
 });

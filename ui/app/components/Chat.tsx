@@ -33,9 +33,6 @@ const Chat: React.FC = () => {
       {/* Header */}
       <header className="border-b dark:border-gray-700 p-4 bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 inline-block text-transparent bg-clip-text">
-            Chat Application
-          </h1>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {isLoading ? 'Processing...' : 'Ready'}
