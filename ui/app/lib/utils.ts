@@ -20,9 +20,9 @@ export function formatDate(timestamp: number): string {
 /**
  * Utility for conditional className merging
  */
-export function cn(...classes: (string | undefined | null | false)[]): string {
-  return classes.filter(Boolean).join(' ')
-}
+// export function cn(...classes: (string | undefined | null | false)[]): string {
+//   return classes.filter(Boolean).join(' ')
+// }
 
 /**
  * Safely truncate a string to a specified length
