@@ -1,6 +1,9 @@
 # Tweet RAG Agent API
 
 [![codecov](https://codecov.io/github/alexanimal/agent-smyth-technical/graph/badge.svg?token=B2BI5398GF)](https://codecov.io/github/alexanimal/agent-smyth-technical)
+[![UI](https://img.shields.io/badge/Try%20It-Live%20Demo-blue)](https://alexanimal.github.io/agent-smyth-technical/)
+
+
 
 ## Table of Contents
 
