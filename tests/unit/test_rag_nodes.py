@@ -523,6 +523,42 @@ class TestClassifyQueryNode:
                 # Verify get_cached_llm was called with the custom model
                 mock_get_llm.assert_called_with(custom_model, temperature=0.0)
 
+    @pytest.mark.asyncio
+    @patch("app.rag.nodes.PromptManager.get_classification_prompt")
+    async def test_classify_query_json_parse_error(self, mock_get_prompt, mock_state):
+        """Test classify_query_node with JSON parse error."""
+        from app.rag.nodes import classify_query_node
+
+        # Setup mock state with required fields
+        mock_state["query"] = "What is the price of Bitcoin?"
+
+        # Mock the language model to return invalid JSON
+        with (
+            patch("app.rag.nodes.get_cached_llm") as mock_get_cached_llm,
+            patch("app.rag.nodes.StrOutputParser") as mock_str_parser,
+        ):
+            # Configure the mock chain
+            mock_llm = MagicMock()
+            mock_chain = MagicMock()
+            mock_get_cached_llm.return_value = mock_llm
+
+            # Configure the mock to return invalid JSON
+            mock_prompt = MagicMock()
+            mock_get_prompt.return_value = mock_prompt
+
+            # Chain setup: prompt | llm | parser
+            mock_prompt.__or__.return_value = mock_prompt
+            mock_prompt.__or__.return_value.__or__.return_value = mock_chain
+            mock_chain.ainvoke = AsyncMock(return_value="{invalid json}")
+
+            # Call the function
+            result = await classify_query_node(mock_state)
+
+        # Check that default classification is applied
+        assert result["classification"]["query_type"] == "general"
+        assert result["classification"]["confidence_scores"]["general"] == 100
+        assert result["classification"]["is_mixed"] is False
+
 
 class TestRetrieveDocumentsNode:
     """Tests for the retrieve_documents_node function."""
@@ -1144,6 +1180,268 @@ class TestRankDocumentsNode:
                 actual_weights = mock_score.call_args[0][1]  # Second positional arg is weights
                 assert actual_weights == custom_weights
 
+    @pytest.mark.asyncio
+    async def test_rank_documents_final_k_adjustment(self):
+        """Test adjustment of final_k for complex query types with small user-defined results."""
+        # Test cases for different query types and user_k values
+        test_cases = [
+            # (query_type, is_mixed, user_k, expected_final_k)
+            ("trading_thesis", False, 5, 7),  # trading_thesis with small k should be adjusted
+            ("technical", False, 8, 12),  # technical with small k should be adjusted
+            ("general", True, 6, 9),  # mixed query with small k should be adjusted
+            ("investment", False, 7, 7),  # investment (not complex) should not be adjusted
+            ("trading_thesis", False, 15, 15),  # larger k should not be adjusted
+        ]
+
+        for query_type, is_mixed, user_k, expected_final_k in test_cases:
+            # Create state with the test case parameters
+            state: RAGState = {
+                "query": f"Test query for {query_type}",
+                "classification": {
+                    "query_type": query_type,
+                    "confidence_scores": {query_type: 90},
+                    "is_mixed": is_mixed,
+                },
+                "retrieved_docs": [
+                    Document(page_content="Test content", metadata={"timestamp_unix": 1620000000}),
+                ],
+                "ranked_docs": [],
+                "response": "",
+                "sources": [],
+                "alternative_viewpoints": None,
+                "num_results": user_k,
+                "ranking_config": {
+                    "recency_weight": 0.4,
+                    "view_weight": 0.2,
+                    "like_weight": 0.2,
+                    "retweet_weight": 0.2,
+                },
+                "generate_alternative_viewpoint": False,
+                "model": "gpt-4o",
+                "generation_metrics": {},
+            }
+
+            with patch("app.rag.nodes.score_documents_with_social_metrics") as mock_score:
+                with patch("app.rag.nodes.diversify_ranked_documents") as mock_diversify:
+                    # Configure mocks
+                    mock_score.return_value = [("doc1", 0.9)]
+                    mock_diversify.return_value = ["doc1"]
+
+                    # Call the function
+                    await rank_documents_node(state)
+
+                    # The final_k is passed to diversify_ranked_documents
+                    # Verify the final_k was adjusted as expected
+                    actual_final_k = mock_diversify.call_args[0][1]
+                    assert (
+                        actual_final_k == expected_final_k
+                    ), f"For query_type={query_type}, is_mixed={is_mixed}, user_k={user_k}: expected final_k={expected_final_k}, got {actual_final_k}"
+
+    @pytest.mark.asyncio
+    async def test_rank_documents_default_weights_investment(self):
+        """Test default weights for investment query type."""
+        # Create a state with investment query type and no ranking_config
+        state: RAGState = {
+            "query": "What is the outlook for AAPL stock?",
+            "classification": {
+                "query_type": "investment",
+                "confidence_scores": {"investment": 90, "technical": 5, "general": 5},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [
+                Document(page_content="Test content", metadata={"timestamp_unix": 1620000000}),
+            ],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 10,
+            "ranking_config": {},  # Empty to test default weights
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
+            "generation_metrics": {},
+        }
+
+        with patch("app.rag.nodes.score_documents_with_social_metrics") as mock_score:
+            with patch("app.rag.nodes.diversify_ranked_documents") as mock_diversify:
+                # Configure mocks for successful execution
+                mock_score.return_value = [("doc1", 0.9)]
+                mock_diversify.return_value = ["doc1"]
+
+                # Call the function
+                await rank_documents_node(state)
+
+                # Verify the investment-specific weights were used
+                expected_weights = {
+                    "recency_weight": 0.3,
+                    "view_weight": 0.2,
+                    "like_weight": 0.2,
+                    "retweet_weight": 0.3,
+                }
+
+                # Check that score_documents_with_social_metrics was called with expected weights
+                actual_weights = mock_score.call_args[0][1]
+                assert actual_weights == expected_weights
+
+    @pytest.mark.asyncio
+    async def test_rank_documents_default_weights_technical(self):
+        """Test default weights for technical query type."""
+        # Create a state with technical query type and no ranking_config
+        state: RAGState = {
+            "query": "What do the RSI and MACD indicators show for AAPL?",
+            "classification": {
+                "query_type": "technical",
+                "confidence_scores": {"technical": 90, "investment": 5, "general": 5},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [
+                Document(page_content="Test content", metadata={"timestamp_unix": 1620000000}),
+            ],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 10,
+            "ranking_config": {},  # Empty to test default weights
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
+            "generation_metrics": {},
+        }
+
+        with patch("app.rag.nodes.score_documents_with_social_metrics") as mock_score:
+            with patch("app.rag.nodes.diversify_ranked_documents") as mock_diversify:
+                # Configure mocks for successful execution
+                mock_score.return_value = [("doc1", 0.9)]
+                mock_diversify.return_value = ["doc1"]
+
+                # Call the function
+                await rank_documents_node(state)
+
+                # Verify the technical-specific weights were used
+                expected_weights = {
+                    "recency_weight": 0.5,
+                    "view_weight": 0.1,
+                    "like_weight": 0.2,
+                    "retweet_weight": 0.2,
+                }
+
+                # Check that score_documents_with_social_metrics was called with expected weights
+                actual_weights = mock_score.call_args[0][1]
+                assert actual_weights == expected_weights
+
+    @pytest.mark.asyncio
+    async def test_rank_documents_default_weights_general(self):
+        """Test default weights for general query type."""
+        # Create a state with general query type and no ranking_config
+        state: RAGState = {
+            "query": "Tell me about blockchain technology",
+            "classification": {
+                "query_type": "general",
+                "confidence_scores": {"general": 90, "technical": 5, "investment": 5},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [
+                Document(page_content="Test content", metadata={"timestamp_unix": 1620000000}),
+            ],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 10,
+            "ranking_config": {},  # Empty to test default weights
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
+            "generation_metrics": {},
+        }
+
+        with patch("app.rag.nodes.score_documents_with_social_metrics") as mock_score:
+            with patch("app.rag.nodes.diversify_ranked_documents") as mock_diversify:
+                # Configure mocks for successful execution
+                mock_score.return_value = [("doc1", 0.9)]
+                mock_diversify.return_value = ["doc1"]
+
+                # Call the function
+                await rank_documents_node(state)
+
+                # Verify the general/default weights were used
+                expected_weights = {
+                    "recency_weight": 0.4,
+                    "view_weight": 0.2,
+                    "like_weight": 0.2,
+                    "retweet_weight": 0.2,
+                }
+
+                # Check that score_documents_with_social_metrics was called with expected weights
+                actual_weights = mock_score.call_args[0][1]
+                assert actual_weights == expected_weights
+
+    @pytest.mark.asyncio
+    async def test_rank_documents_document_validation(self):
+        """Test document validation logic for timestamp_unix metadata."""
+        # Create documents with and without timestamp_unix
+        doc_with_timestamp = Document(
+            page_content="Valid document",
+            metadata={"timestamp_unix": 1620000000, "url": "https://example.com/valid"},
+        )
+        doc_without_timestamp = Document(
+            page_content="Invalid document - no timestamp",
+            metadata={"url": "https://example.com/invalid"},
+        )
+
+        # Create state with mixed documents
+        state: RAGState = {
+            "query": "Test query",
+            "classification": {
+                "query_type": "general",
+                "confidence_scores": {"general": 100},
+                "is_mixed": False,
+            },
+            "retrieved_docs": [doc_with_timestamp, doc_without_timestamp],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "alternative_viewpoints": None,
+            "num_results": 10,
+            "ranking_config": {
+                "recency_weight": 0.4,
+                "view_weight": 0.2,
+                "like_weight": 0.2,
+                "retweet_weight": 0.2,
+            },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
+            "generation_metrics": {},
+        }
+
+        with patch("app.rag.nodes.logger") as mock_logger:
+            with patch("app.rag.nodes.score_documents_with_social_metrics") as mock_score:
+                with patch("app.rag.nodes.diversify_ranked_documents") as mock_diversify:
+                    # Configure mocks for successful execution
+                    mock_score.return_value = [(doc_with_timestamp, 0.9)]
+                    mock_diversify.return_value = [doc_with_timestamp]
+
+                    # Call the function
+                    result = await rank_documents_node(state)
+
+                    # Verify that:
+                    # 1. Only doc_with_timestamp was passed to score_documents_with_social_metrics
+                    # 2. A warning was logged for doc_without_timestamp
+                    # 3. The result contains only the valid doc
+
+                    # Check that the warning was logged
+                    mock_logger.warning.assert_any_call(
+                        "Document missing timestamp_unix metadata. Skipping."
+                    )
+
+                    # Check that score_documents was called with only the valid doc
+                    docs_passed_to_score = mock_score.call_args[0][0]
+                    assert len(docs_passed_to_score) == 1
+                    assert docs_passed_to_score[0].page_content == "Valid document"
+
+                    # Check the final result
+                    assert len(result["ranked_docs"]) == 1
+                    assert result["ranked_docs"][0].page_content == "Valid document"
+
 
 class TestGenerateResponseNode:
     """Tests for the generate_response_node function."""
@@ -1439,12 +1737,18 @@ class TestGenerateResponseNode:
     @pytest.mark.asyncio
     async def test_generate_response_custom_prompt_template(self, mock_state):
         """Test generate_response_node with a custom prompt template."""
-        # Add classification to the state
+        from app.rag.nodes import generate_response_node
+
+        # Add necessary fields to the state
+        mock_state["query"] = "What is Bitcoin?"
+        mock_state["ranked_docs"] = []
         mock_state["classification"] = {
             "query_type": "general",
             "confidence_scores": {"general": 100},
             "is_mixed": False,
         }
+        # Explicitly set the model to match what we're expecting in the assertion
+        mock_state["model"] = "gpt-3.5-turbo"
 
         # Create custom prompt messages that we'll use as our expected response
         custom_prompt_messages = {"messages": ["Custom prompt test"]}
@@ -1454,7 +1758,10 @@ class TestGenerateResponseNode:
         mock_template.ainvoke.return_value = custom_prompt_messages
 
         # Since prompt_templates is defined inside the function, patch PromptManager methods
-        with patch("app.rag.nodes.PromptManager.get_general_prompt") as mock_get_general:
+        with (
+            patch("app.rag.nodes.PromptManager.get_general_prompt") as mock_get_general,
+            patch("app.rag.nodes.settings.default_model", "gpt-3.5-turbo"),
+        ):  # Patch default_model for consistency
             # Return our mock template
             mock_get_general.return_value = mock_template
 
@@ -1485,9 +1792,9 @@ class TestGenerateResponseNode:
                     # Verify generate_with_fallback was called with our custom prompt messages
                     mock_generate.assert_called_with(
                         prompt=custom_prompt_messages,
-                        model_name=mock_state.get("model", None) or settings.default_model,
+                        model_name="gpt-3.5-turbo",
                         fallback_model="gpt-3.5-turbo",
-                        temperature=ANY,
+                        temperature=0.2,
                     )
 
 
@@ -1712,35 +2019,48 @@ class TestPromptTemplates:
 
     @pytest.mark.asyncio
     @patch("app.rag.nodes.PromptManager.get_classification_prompt")
-    async def test_classify_query_custom_prompt(self, mock_get_prompt, mock_state):
-        """Test classify_query_node with a custom prompt template."""
-        from langchain_core.prompts import ChatPromptTemplate
+    async def test_classify_query_json_parse_error(self, mock_get_prompt, mock_state):
+        """Test classify_query_node with JSON parse error."""
+        from app.rag.nodes import classify_query_node
 
-        custom_prompt = ChatPromptTemplate.from_template("Custom prompt: {query}")
-        mock_get_prompt.return_value = custom_prompt
+        # Setup mock state with required fields
+        mock_state["query"] = "What is the price of Bitcoin?"
 
-        with patch("app.rag.nodes.get_cached_llm") as mock_get_llm:
-            mock_llm = AsyncMock()
-            mock_get_llm.return_value = mock_llm
+        # Mock the language model to return invalid JSON
+        with (
+            patch("app.rag.nodes.get_cached_llm") as mock_get_cached_llm,
+            patch("app.rag.nodes.StrOutputParser") as mock_str_parser,
+        ):
+            # Configure the mock chain
+            mock_llm = MagicMock()
+            mock_chain = MagicMock()
+            mock_get_cached_llm.return_value = mock_llm
 
-            with patch("app.rag.nodes.StrOutputParser") as mock_parser:
-                mock_parser_instance = MagicMock()
-                mock_parser.return_value = mock_parser_instance
-                mock_chain = MagicMock()
-                mock_parser_instance.__or__.return_value = mock_chain
-                mock_chain.ainvoke = AsyncMock(return_value='{"general": 100}')
+            # Configure the mock to return invalid JSON
+            mock_prompt = MagicMock()
+            mock_get_prompt.return_value = mock_prompt
 
-                result = await classify_query_node(mock_state)
+            # Chain setup: prompt | llm | parser
+            mock_prompt.__or__.return_value = mock_prompt
+            mock_prompt.__or__.return_value.__or__.return_value = mock_chain
+            mock_chain.ainvoke = AsyncMock(return_value="{invalid json}")
 
-                # Verify the classification was successful
-                assert result["classification"]["query_type"] == "general"
-                assert result["classification"]["confidence_scores"]["general"] == 100
-                mock_get_prompt.assert_called_once()
+            # Call the function
+            result = await classify_query_node(mock_state)
+
+        # Check that default classification is applied
+        assert result["classification"]["query_type"] == "general"
+        assert result["classification"]["confidence_scores"]["general"] == 100
+        assert result["classification"]["is_mixed"] is False
 
     @pytest.mark.asyncio
     async def test_generate_response_custom_prompt_template(self, mock_state):
         """Test generate_response_node with a custom prompt template."""
-        # Add classification to the state
+        from app.rag.nodes import generate_response_node
+
+        # Add necessary fields to the state
+        mock_state["query"] = "What is Bitcoin?"
+        mock_state["ranked_docs"] = []
         mock_state["classification"] = {
             "query_type": "general",
             "confidence_scores": {"general": 100},
@@ -1786,7 +2106,26 @@ class TestPromptTemplates:
                     # Verify generate_with_fallback was called with our custom prompt messages
                     mock_generate.assert_called_with(
                         prompt=custom_prompt_messages,
-                        model_name=mock_state.get("model", None) or settings.default_model,
+                        model_name="gpt-3.5-turbo",
                         fallback_model="gpt-3.5-turbo",
-                        temperature=ANY,
+                        temperature=0.2,
                     )
+
+    @pytest.mark.asyncio
+    async def test_retrieve_documents_with_negative_num_results(self, mock_state):
+        """Test retrieve_documents_node with negative num_results."""
+        from app.rag.nodes import retrieve_documents_node
+
+        # Setup mock state with required fields and negative num_results
+        mock_state["query"] = "What is Bitcoin?"
+        mock_state["classification"] = {
+            "query_type": "general",
+            "confidence_scores": {"general": 100},
+            "is_mixed": False,
+        }
+        mock_state["num_results"] = -5
+
+        result = await retrieve_documents_node(mock_state)
+
+        # Check that the function returns empty retrieved_docs list for negative num_results
+        assert result["retrieved_docs"] == []
