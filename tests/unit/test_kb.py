@@ -1071,3 +1071,136 @@ async def test_end_to_end_kb_creation_and_use(mock_exists, kb_manager, valid_doc
         # Verify we got the expected results
         assert len(results) == 2
         assert results == valid_documents[:2]
+
+
+#################################################
+# Additional Tests for Directory Fallback and Error Handling
+#################################################
+
+
+@patch("os.path.exists")
+def test_mocks_dir_fallback_mechanism(mock_exists):
+    """Test the fallback mechanism for finding data directory (lines 60-68)."""
+    # Setup mock to simulate that no directories exist initially
+    # First call is for the initial path, second for the fallback, third for the final fallback check
+    mock_exists.side_effect = [False, False]
+
+    with patch("pathlib.Path.resolve") as mock_resolve:
+        # Setup mock to return a consistent project root path
+        mock_project_root = MagicMock()
+        mock_resolve.return_value.parent.parent.parent = mock_project_root
+
+        # Set up consistent paths for different directory attempts
+        original_path = Path("/fake/project/data")
+        fallback_path = Path("/fake/project/app/data")
+
+        # Mock the path joining to return predictable paths
+        # We need to handle multiple calls to __truediv__ since the Path object is accessed multiple times
+        # The Path object will be used for:
+        # 1. project_root / "data"
+        # 2. project_root / "app"
+        # 3. app_path / "data"
+        # 4. project_root / "data" (for final fallback)
+
+        app_path = MagicMock()
+        app_path.__truediv__.return_value = fallback_path  # app_path / "data"
+
+        def side_effect(arg):
+            if arg == "data":
+                return original_path
+            elif arg == "app":
+                return app_path
+            return MagicMock()
+
+        mock_project_root.__truediv__.side_effect = side_effect
+
+        # Capture print statements
+        with patch("builtins.print") as mock_print:
+            # Create KB manager, which should trigger the fallback logic
+            kb = KnowledgeBaseManager()
+
+            # By the end, we should have the fallback path
+            assert kb.mocks_dir == str(original_path)
+
+            # Verify the print messages for directory not found
+            mock_print.assert_any_call(
+                f"Data directory not found at {str(original_path)}, checking alternate location"
+            )
+            mock_print.assert_any_call(
+                f"Data directory not found at alternate location either, using {str(original_path)}"
+            )
+
+
+def test_metadata_extractor_timestamp_parsing_error(kb_manager):
+    """Test error handling in timestamp parsing (lines 87-89)."""
+    # Create a record with invalid timestamp format
+    record = {
+        "id": "12345",
+        "createdAt": "invalid-timestamp-format",
+        "url": "https://example.com/12345",
+        "profile": "testuser",
+    }
+
+    # Set up logger mock
+    with patch("app.kb.manager.logger") as mock_logger:
+        # Extract metadata
+        result = kb_manager.metadata_extractor(record, {})
+
+        # Verify the warning was logged
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "Could not parse timestamp" in warning_msg
+        assert "invalid-timestamp-format" in warning_msg
+
+        # Verify result still has metadata but timestamp_unix is None
+        assert result["id"] == "12345"
+        assert result["created_at"] == "invalid-timestamp-format"
+        assert result["timestamp_unix"] is None
+
+
+def test_metadata_extractor_social_metrics_conversion(kb_manager):
+    """Test error handling in social metrics conversion (lines 99-110)."""
+    # Create a record with non-integer social metrics
+    record = {
+        "id": "12345",
+        "createdAt": "2023-01-01T12:00:00Z",
+        "url": "https://example.com/12345",
+        "profile": "testuser",
+        "viewCount": "not-a-number",
+        "likeCount": None,
+        "retweetCount": {"invalid": "structure"},
+    }
+
+    # Extract metadata
+    result = kb_manager.metadata_extractor(record, {})
+
+    # Verify all metrics were converted to 0 when invalid
+    assert result["viewCount"] == 0
+    assert result["likeCount"] == 0
+    assert result["retweetCount"] == 0
+
+    # Verify other fields still present
+    assert result["id"] == "12345"
+    assert result["created_at"] == "2023-01-01T12:00:00Z"
+
+
+def test_metadata_extractor_social_metrics_partial_conversion(kb_manager):
+    """Test partial success in social metrics conversion (lines 99-110)."""
+    # Create a record with mixed valid and invalid social metrics
+    record = {
+        "id": "12345",
+        "createdAt": "2023-01-01T12:00:00Z",
+        "url": "https://example.com/12345",
+        "profile": "testuser",
+        "viewCount": 100,  # Valid integer
+        "likeCount": "50",  # String that can be converted
+        "retweetCount": None,  # None value
+    }
+
+    # Extract metadata
+    result = kb_manager.metadata_extractor(record, {})
+
+    # Verify conversion results
+    assert result["viewCount"] == 100  # Should remain 100
+    assert result["likeCount"] == 50  # Should be converted to 50
+    assert result["retweetCount"] == 0  # Should default to 0
