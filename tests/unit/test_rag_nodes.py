@@ -2129,3 +2129,189 @@ class TestPromptTemplates:
 
         # Check that the function returns empty retrieved_docs list for negative num_results
         assert result["retrieved_docs"] == []
+
+
+class TestClassifyQueryNodeJsonParsing:
+    """Tests specifically for the JSON parsing logic in classify_query_node (lines 110-174)."""
+
+    @pytest.fixture
+    def mock_state(self) -> RAGState:
+        """Create a mock state for testing."""
+        return {
+            "query": "What is the Bitcoin price trend?",
+            "retrieved_docs": [],
+            "ranked_docs": [],
+            "response": "",
+            "sources": [],
+            "classification": {},
+            "alternative_viewpoints": None,
+            "num_results": 25,
+            "ranking_config": {
+                "k": 15,
+                "oversample_factor": 3,
+            },
+            "generate_alternative_viewpoint": False,
+            "model": "gpt-4o",
+            "generation_metrics": {},
+        }
+
+    @pytest.mark.asyncio
+    async def test_empty_classification_result(self, mock_state):
+        """Test handling of empty classification result (line 129-131)."""
+        from app.rag.nodes import classify_query_node
+
+        with patch("app.rag.nodes.logger") as mock_logger:
+            # Create a patch for PromptManager
+            with patch("app.rag.nodes.PromptManager") as mock_prompt_manager:
+                # Create a patch for StrOutputParser
+                with patch("app.rag.nodes.StrOutputParser") as mock_output_parser:
+                    # Mock the chain to return empty string
+                    mock_chain = AsyncMock()
+                    mock_chain.ainvoke.return_value = "   "
+
+                    # Set up mock LLM that properly handles async
+                    mock_llm = AsyncMock()
+                    with patch("app.rag.nodes.get_cached_llm", return_value=mock_llm):
+                        # Set up the chain with the output parser
+                        mock_output_parser.return_value.parse.return_value = "   "
+                        mock_prompt = MagicMock()
+                        mock_prompt_manager.get_classification_prompt.return_value = mock_prompt
+                        # Properly configure the mock chain for async operations
+                        mock_prompt.__or__.return_value = MagicMock()
+                        mock_prompt.__or__.return_value.__or__.return_value = mock_chain
+
+                        # Act
+                        result = await classify_query_node(mock_state)
+
+            # Assert
+            assert result["classification"]["query_type"] == "general"
+            assert result["classification"]["confidence_scores"]["general"] == 100
+            assert result["classification"]["is_mixed"] is False
+
+            # Verify logger was called with the correct message
+            # The implementation logs a different message than what was originally expected
+            mock_logger.warning.assert_called_with(
+                "Classification parsing failed: Empty classification result. Using default classification."
+            )
+
+    @pytest.mark.asyncio
+    async def test_missing_required_keys_in_json(self, mock_state):
+        """Test handling of JSON missing required keys (lines 137-149)."""
+        from app.rag.nodes import classify_query_node
+
+        # Arrange - JSON with only some of the required keys
+        partial_json = """{"technical": 20, "investment": 80}"""
+
+        with patch("app.rag.nodes.logger") as mock_logger:
+            # Create patches for the necessary components
+            with patch("app.rag.nodes.PromptManager") as mock_prompt_manager:
+                with patch("app.rag.nodes.StrOutputParser") as mock_output_parser:
+                    # Mock the chain to return partial JSON
+                    mock_chain = AsyncMock()
+                    mock_chain.ainvoke.return_value = partial_json
+
+                    # Set up mock LLM that properly handles async
+                    mock_llm = AsyncMock()
+                    with patch("app.rag.nodes.get_cached_llm", return_value=mock_llm):
+                        # Set up the chain with the output parser
+                        mock_output_parser.return_value.parse.return_value = partial_json
+                        mock_prompt = MagicMock()
+                        mock_prompt_manager.get_classification_prompt.return_value = mock_prompt
+                        # Properly configure the mock chain for async operations
+                        mock_prompt.__or__.return_value = MagicMock()
+                        mock_prompt.__or__.return_value.__or__.return_value = mock_chain
+
+                        # Act
+                        result = await classify_query_node(mock_state)
+
+            # Assert - Default values should be set for all scores when keys are missing
+            assert result["classification"]["query_type"] == "general"
+            assert result["classification"]["confidence_scores"]["general"] == 100
+            assert result["classification"]["confidence_scores"]["technical"] == 0
+            assert result["classification"]["confidence_scores"]["trading_thesis"] == 0
+            assert result["classification"]["confidence_scores"]["investment"] == 0
+            assert result["classification"]["is_mixed"] is False
+
+            # Verify the warning about missing keys was logged
+            mock_logger.warning.assert_called_with(
+                f"Invalid classification result missing required keys: {partial_json}, defaulting to general"
+            )
+
+    @pytest.mark.asyncio
+    async def test_valid_json_parsing(self, mock_state):
+        """Test successful parsing of valid JSON (lines 124-136)."""
+        from app.rag.nodes import classify_query_node
+
+        # Arrange - Valid JSON with all required keys
+        valid_json = """{"technical": 10, "trading_thesis": 5, "investment": 70, "general": 15}"""
+
+        with patch("app.rag.nodes.logger") as mock_logger:
+            # Create patches for the necessary components
+            with patch("app.rag.nodes.PromptManager") as mock_prompt_manager:
+                with patch("app.rag.nodes.StrOutputParser") as mock_output_parser:
+                    # Mock the chain to return valid JSON
+                    mock_chain = AsyncMock()
+                    mock_chain.ainvoke.return_value = valid_json
+
+                    # Set up mock LLM that properly handles async
+                    mock_llm = AsyncMock()
+                    with patch("app.rag.nodes.get_cached_llm", return_value=mock_llm):
+                        # Set up the chain with the output parser
+                        mock_output_parser.return_value.parse.return_value = valid_json
+                        mock_prompt = MagicMock()
+                        mock_prompt_manager.get_classification_prompt.return_value = mock_prompt
+                        # Properly configure the mock chain for async operations
+                        mock_prompt.__or__.return_value = MagicMock()
+                        mock_prompt.__or__.return_value.__or__.return_value = mock_chain
+
+                        # Act
+                        result = await classify_query_node(mock_state)
+
+            # Assert - Values should match the JSON input
+            assert result["classification"]["query_type"] == "investment"
+            assert result["classification"]["confidence_scores"]["investment"] == 70
+            assert result["classification"]["confidence_scores"]["technical"] == 10
+            assert result["classification"]["confidence_scores"]["trading_thesis"] == 5
+            assert result["classification"]["confidence_scores"]["general"] == 15
+            assert result["classification"]["is_mixed"] is False
+
+            # Verify debug logging of raw result
+            mock_logger.debug.assert_called_with(f"Raw classification result: '{valid_json}'")
+
+    @pytest.mark.asyncio
+    async def test_mixed_query_detection(self, mock_state):
+        """Test detection of mixed queries based on confidence scores (line 165)."""
+        from app.rag.nodes import classify_query_node
+
+        # Arrange - JSON with multiple high confidence scores
+        mixed_query_json = (
+            """{"technical": 45, "trading_thesis": 5, "investment": 40, "general": 10}"""
+        )
+
+        # Create patches for the necessary components
+        with patch("app.rag.nodes.PromptManager") as mock_prompt_manager:
+            with patch("app.rag.nodes.StrOutputParser") as mock_output_parser:
+                # Mock the chain to return JSON with mixed confidence scores
+                mock_chain = AsyncMock()
+                mock_chain.ainvoke.return_value = mixed_query_json
+
+                # Set up mock LLM that properly handles async
+                mock_llm = AsyncMock()
+                with patch("app.rag.nodes.get_cached_llm", return_value=mock_llm):
+                    # Set up the chain with the output parser
+                    mock_output_parser.return_value.parse.return_value = mixed_query_json
+                    mock_prompt = MagicMock()
+                    mock_prompt_manager.get_classification_prompt.return_value = mock_prompt
+                    # Properly configure the mock chain for async operations
+                    mock_prompt.__or__.return_value = MagicMock()
+                    mock_prompt.__or__.return_value.__or__.return_value = mock_chain
+
+                    # Act
+                    result = await classify_query_node(mock_state)
+
+        # Assert - Highest score determines query type
+        assert result["classification"]["query_type"] == "technical"
+        assert result["classification"]["confidence_scores"]["technical"] == 45
+        assert result["classification"]["confidence_scores"]["investment"] == 40
+        # Verify mixed query detection - should be mixed since investment (40) > 30
+        assert result["classification"]["is_mixed"] is True
