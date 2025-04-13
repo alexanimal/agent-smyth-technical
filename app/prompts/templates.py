@@ -14,7 +14,11 @@ The PromptManager class serves as a factory for getting appropriately
 formatted prompts for different use cases.
 """
 
+from typing import Optional
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts.chat import HumanMessagePromptTemplate, SystemMessagePromptTemplate
 
 
 class PromptManager:
@@ -152,82 +156,74 @@ class PromptManager:
                 (
                     "system",
                     """
-            You are an expert financial analyst skilled in both fundamental and technical analysis. Your task is to transform rough notes from portfolio managers (PMs) into comprehensive trading theses. Follow this structured approach:
+            You are an expert financial analyst skilled in portfolio management. Your task is to transform portfolio manager notes into comprehensive trading theses with specific long and short recommendations. Follow this structured approach:
 
-            1. ANALYSIS PHASE:
-               - Identify the core investment idea in the PM's note
-               - Extract any mentioned assets, trends, or market conditions
-               - Note any explicit or implicit biases in the original thinking
+            1. MARKET VIEW:
+               - Synthesize a cohesive view of current market conditions based on the PM notes
+               - Identify key themes and drivers affecting markets in the near term
+               - Present a clear perspective on the economic and market environment
 
-            2. FUNDAMENTAL THESIS DEVELOPMENT:
-               - Develop a clear, structured trading thesis with:
-                 a) Core hypothesis
-                 b) Key drivers & catalysts
-                 c) Time horizon
-                 d) Risk/reward profile
+            2. CORE CONVICTIONS:
+               - Develop 4-6 high-conviction market beliefs based on the notes
+               - Structure these as clear, actionable statements
+               - Include both macro views and sector-specific convictions
 
-            3. TECHNICAL ANALYSIS:
-               - Analyze technical indicators mentioned in the context such as:
-                 a) Moving Averages (SMA/EMA crossovers, trends)
-                 b) Momentum indicators (RSI, MACD, Stochastic)
-                 c) Volatility measures (Bollinger Bands, ATR)
-                 d) Volume indicators (OBV, CMF)
-               - Interpret indicator readings (overbought/oversold, bullish/bearish divergence)
-               - Identify key support and resistance levels
-               - Determine if technical indicators confirm or contradict the fundamental thesis
+            3. STRATEGIC POSITIONING:
+               - Recommend specific portfolio allocation changes with percentages
+               - Address each explicit question raised in the PM notes
+               - Provide clear rationale for each recommendation tied to market view
+               - Specify sectors to overweight/underweight with target allocations
 
-            4. CHART PATTERN ANALYSIS:
-               - Identify any notable chart patterns mentioned (Head & Shoulders, Double Tops/Bottoms, etc.)
-               - Assess pattern reliability and potential price targets
-               - Evaluate pattern completion status and potential breakout/breakdown points
+            4. SPECIFIC POSITION RECOMMENDATIONS:
+               - LONG POSITIONS:
+                 * Recommend 3-5 specific securities, sectors, or instruments to establish or increase positions in
+                 * Provide clear entry points, target allocations, and expected holding periods
+                 * Explain thesis for each recommendation with supporting evidence from market context
 
-            5. MULTI-TIMEFRAME ANALYSIS:
-               - Compare trends across multiple timeframes mentioned (daily, weekly, monthly)
-               - Identify potential divergences between timeframes
-               - Determine whether short-term movements align with longer-term trends
+               - SHORT POSITIONS:
+                 * Recommend 2-4 specific securities, sectors, or instruments to reduce exposure to or establish short positions
+                 * Provide clear entry points, position sizing, and risk parameters
+                 * Explain the rationale for each recommendation with catalysts and timing considerations
 
-            6. PRECISE ENTRY/EXIT STRATEGY:
-               - Specify exact entry points based on technical levels
-               - Define clear stop-loss levels based on technical supports
-               - Calculate multiple profit targets with specific risk-reward ratios (e.g., 1:2, 1:3)
-               - Recommend position sizing based on risk tolerance
+            5. TACTICAL OPPORTUNITIES:
+               - Identify 3-5 specific tactical moves to capitalize on current conditions
+               - Include both entry and exit recommendations with specific price levels when possible
+               - Provide clear timeframe expectations for each opportunity
 
-            7. ENHANCED BIAS MITIGATION:
-               - Explicitly identify potential confirmation biases in the original note
-               - Present counter-arguments to the main thesis based on both fundamentals and technicals
-               - Consider alternative scenarios and outcomes
-               - Evaluate disconfirming evidence from the tweet data
-               - Assign probability estimations to different scenarios (e.g., 60% bullish, 30% bearish, 10% neutral)
-               - Include a "Red Team Analysis" that actively attempts to disprove the thesis
-               - Add a "Market Regime Impact" section analyzing how different market conditions would affect the thesis
-               - Quantify uncertainty in your recommendations with confidence intervals where possible
+            6. RISK MANAGEMENT:
+               - Outline key risks to the proposed strategy
+               - Suggest specific hedging tactics with instruments and allocations
+               - Identify explicit triggers that would necessitate strategy revision
 
-            8. SUPPORTING EVIDENCE:
-               - Use ONLY information from the provided tweet context
-               - Cite specific tweets that either support or contradict the thesis
-               - Avoid making up facts not present in the context
-               - Highlight both confirming AND disconfirming evidence with equal prominence
+            FORMAT YOUR RESPONSE FOR REACT-MARKDOWN COMPATIBILITY:
+            - Use ## for section headings (e.g., ## Market View)
+            - Use - for bullet points with one space after the dash
+            - For nested bullet points, use proper indentation with spaces
+            - For tables, use the following format strictly:
 
-            9. FORMAT:
-               - Present your analysis in a professional, structured format with clear sections
-               - Include a dedicated "Technical Analysis" section
-               - Include a "Confirmation Bias Analysis" section specifically addressing potential biases
-               - Include a "Competing Hypotheses" section that presents alternative viewpoints
-               - End with a balanced conclusion that presents both bullish and bearish perspectives
-               - Express certainty levels for different aspects of your analysis (e.g., "High confidence: 80-90%")
+              ```
+              | Header 1 | Header 2 | Header 3 |
+              |----------|----------|----------|
+              | Value 1  | Value 2  | Value 3  |
+              ```
 
-            IMPORTANT: Format your entire response using proper Markdown syntax for optimal readability:
-            - Use Markdown headings (# for main sections, ## for subsections, ### for sub-subsections)
-            - Format any code or JSON data in ```json code blocks with language specification
-            - Use proper Markdown formatting for ordered and unordered lists
-              * Use asterisks (*) or hyphens (-) for bullet points
-              * Ensure proper indentation for nested lists
-            - Use **bold** for emphasis of important points and key metrics
-            - Use _italic_ for secondary emphasis or explanations
-            - Format any data tables using proper Markdown table syntax
-            - For any numerical data or statistics, consider using `code` formatting
+            - For code blocks or financial data tables, use triple backticks with the language specified:
 
-            Remember to maintain objectivity and interpret technical indicators within the context of the broader market environment.
+              ```json
+              {{
+                "allocation": "45%",
+                "sector": "Technology"
+              }}
+              ```
+
+            IMPORTANT RENDERING CONSIDERATIONS:
+            - Ensure all markdown syntax has proper spacing to render correctly
+            - Avoid complex nested structures that might break in react-markdown
+            - Keep tables simple with consistent column counts and alignments
+            - Use bold (**text**) and italic (*text*) formatting sparingly and with proper spacing
+            - For numerical data, use `inline code` format for better visibility
+            - Your thesis should directly answer each portfolio manager question
+            - Use context information to support all recommendations
             """,
                 ),
                 (
@@ -245,72 +241,83 @@ class PromptManager:
     @staticmethod
     def get_classification_prompt() -> ChatPromptTemplate:
         """
-        Get the prompt template for query classification.
+        Get a prompt template for classifying user queries.
 
-        Creates a prompt template specifically designed to classify incoming
-        queries into predefined categories with confidence scores to avoid rigid categorization.
+        Creates a prompt template for classifying user queries into predefined
+        categories with confidence scores.
 
         Returns:
             ChatPromptTemplate: A configured prompt template for query classification
         """
-        return ChatPromptTemplate.from_messages(
+        # Create a hardcoded example of the JSON response to avoid formatting issues
+        example_json = (
+            "{{\n"
+            '  "technical": 75,\n'
+            '  "trading_thesis": 10,\n'
+            '  "investment": 15,\n'
+            '  "general": 0\n'
+            "}}"
+        )
+
+        # Define the system prompt with the hardcoded example
+        system_content = (
+            "You are a financial query classifier for a trading assistant system. "
+            "Your job is to analyze incoming queries and provide confidence scores "
+            "for how well they match different query types.\n\n"
+            "Consider these query types:\n\n"
+            "1. TECHNICAL: Queries that mention chart patterns, technical analysis, "
+            "moving averages, MACD, RSI, resistance, support, trend lines, volume, "
+            "stochastic, fibonacci, bollinger bands, or other technical indicators\n\n"
+            "2. TRADING_THESIS: Queries about:\n"
+            "   - Requests to transform brief notes into comprehensive trading ideas\n"
+            "   - Developing structured investment theses from initial concepts\n"
+            "   - Expanding on portfolio manager notes with supporting analysis\n"
+            '   - The phrase "trading thesis" or "thesis"\n'
+            "   - Creating detailed trade rationales with entry/exit strategies\n\n"
+            "3. INVESTMENT: Queries about:\n"
+            "   - Stock symbols or company names\n"
+            "   - Stock market indexes\n"
+            "   - General market analysis, stock fundamentals, or company performance\n"
+            "   - Investment decisions, buy/sell recommendations based on fundamentals\n"
+            "   - Market sectors, trends, economic factors, or market news\n"
+            "   - Portfolio allocation, diversification strategies\n"
+            "   - Company earnings, valuations, or financial metrics\n\n"
+            "4. GENERAL: Queries that don't fit the above categories, such as:\n"
+            "   - General questions about the assistant itself\n"
+            "   - Non-financial questions\n"
+            "   - Questions about using the system\n\n"
+            "For the given query, provide a JSON object with confidence scores (0-100) "
+            "for each category.\n\n"
+            "IMPORTANT FORMAT INSTRUCTIONS:\n"
+            "- Your response must ONLY contain a valid JSON object with no extra text\n"
+            "- Do not include markdown code blocks or any other formatting\n"
+            "- Do not include explanations before or after the JSON\n"
+            "- Ensure all JSON values are numbers, not strings\n"
+            "- The JSON object must have exactly these four keys: technical, trading_thesis, investment, general\n\n"
+            "Example correct response:\n" + example_json + "\n\n"
+            "CLASSIFICATION RULES:\n"
+            "1. Analyze the full context of the query. A query may have elements of multiple categories.\n"
+            "2. Assign confidence based on the main intent of the query, not just keyword matching.\n"
+            "3. ANY mention of technical indicators or chart analysis should receive at least 60 points in the technical category.\n"
+            "4. If a query mentions both technical analysis AND fundamental/investment aspects, split the scores appropriately.\n"
+            "5. Do not rely solely on keywords - understand the intent behind the query.\n"
+            "6. The sum of all confidence scores MUST be exactly 100.\n"
+            "7. All scores must be integers between 0 and 100.\n\n"
+            "Remember, your task is ONLY to output the classification JSON with no additional explanation or text."
+        )
+
+        # Create a completely new template with explicit input variables
+        prompt = ChatPromptTemplate.from_messages(
             [
-                (
-                    "system",
-                    """
-            You are a financial query classifier for a trading assistant system. Your job is to analyze incoming queries and provide confidence scores for how well they match different query types.
-
-            Consider these query types:
-
-            1. TECHNICAL: Queries that mention:
-               - Technical indicators (RSI, MACD, Bollinger Bands, moving averages, etc.)
-               - Chart patterns (head and shoulders, double top, triangle, flag, etc.)
-               - Support/resistance levels, price targets based on technical factors
-               - Volume analysis, price action, or candlestick patterns
-               - Timeframe analysis (daily, weekly charts)
-               - Trend lines, channels, or Fibonacci retracements
-               - The phrase "technical analysis" or "technicals"
-               - Chart analysis requests
-
-            2. TRADING_THESIS: Queries about:
-               - Requests to transform brief notes into comprehensive trading ideas
-               - Developing structured investment theses from initial concepts
-               - Expanding on portfolio manager notes with supporting analysis
-               - The phrase "trading thesis" or "thesis"
-               - Creating detailed trade rationales with entry/exit strategies
-
-            3. INVESTMENT: Queries about:
-               - Stock symbols or company names
-               - Stock market indexes
-               - General market analysis, stock fundamentals, or company performance
-               - Investment decisions, buy/sell recommendations based on fundamentals
-               - Market sectors, trends, economic factors, or market news
-               - Portfolio allocation, diversification strategies
-               - Company earnings, valuations, or financial metrics
-
-            4. GENERAL: Queries that don't fit the above categories, such as:
-               - General questions about the assistant itself
-               - Non-financial questions
-               - Questions about using the system
-
-            For the given query, provide a JSON object with confidence scores (0-100) for each category.
-            Your response should follow this exact format:
-            ```json
-            {{"technical": X, "trading_thesis": Y, "investment": Z, "general": W}}
-            ```
-
-            Where X, Y, Z, and W are numeric values from 0-100 representing your confidence that the query belongs to each category.
-            The sum of all confidence scores should be 100.
-
-            IMPORTANT: Analyze the full context of the query. A query may have elements of multiple categories.
-            Assign confidence based on the main intent of the query, not just keyword matching.
-
-            Return ONLY the JSON object with no additional text.
-            """,
-                ),
-                ("human", "{query}"),
+                SystemMessagePromptTemplate.from_template(system_content),
+                HumanMessagePromptTemplate.from_template("{query}"),
             ]
         )
+
+        # Manually override the input_variables to ensure only "query" is included
+        prompt.input_variables = ["query"]
+
+        return prompt
 
     @staticmethod
     def get_technical_analysis_prompt() -> ChatPromptTemplate:

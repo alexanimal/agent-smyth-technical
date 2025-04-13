@@ -1,6 +1,9 @@
 # Tweet RAG Agent API
 
 [![codecov](https://codecov.io/github/alexanimal/agent-smyth-technical/graph/badge.svg?token=B2BI5398GF)](https://codecov.io/github/alexanimal/agent-smyth-technical)
+[![UI](https://img.shields.io/badge/Try%20It-Live%20Demo-blue)](https://alexanimal.github.io/agent-smyth-technical/)
+
+
 
 ## Table of Contents
 
@@ -14,6 +17,7 @@
 - [Running the Application](#running-the-application)
 - [Development Workflow](#development-workflow)
 - [API Usage](#api-usage)
+- [Web Interface](#web-interface)
 - [Testing](#testing)
 - [CI/CD](#cicd)
 - [Building and Packaging](#building-and-packaging)
@@ -25,6 +29,8 @@
 ## Overview
 
 This project provides a FastAPI-based API for a Retrieval-Augmented Generation (RAG) agent. The agent uses LangGraph, LangChain, and OpenAI's models to answer user queries based on a knowledge base built from tweet data (expected in JSON format). It features automatic query classification, source attribution, background knowledge base loading with persistence, automated code quality checks, CI/CD pipelines, and detailed API documentation.
+
+**Try it out:** Access the web interface at [https://alexanimal.github.io/agent-smyth-technical/](https://alexanimal.github.io/agent-smyth-technical/)
 
 ## Key Features
 
@@ -211,6 +217,16 @@ curl -X 'POST' \
 ```
 
 Refer to the `/docs` endpoint for detailed information on all endpoints (`/`, `/health`, `/chat`), request/response models, and headers.
+
+## Web Interface
+
+A web-based user interface is available at [https://alexanimal.github.io/agent-smyth-technical/](https://alexanimal.github.io/agent-smyth-technical/). This interface provides an easy way to interact with the RAG agent without using direct API calls.
+
+Key features of the web interface:
+- User-friendly chat interface
+- View sources used in responses
+- Toggle alternative viewpoint generation
+- Adjust number of retrieved documents
 
 ## Testing
 

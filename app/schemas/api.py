@@ -60,7 +60,7 @@ class ChatRequest(BaseModel):
     message: str = Field(
         ...,
         min_length=3,  # Validator handles stripping
-        max_length=1000,
+        max_length=50000,  # Increased limit to support large text inputs
         description="The user's query text",
         json_schema_extra={"example": "What are investors saying about AAPL?"},
     )

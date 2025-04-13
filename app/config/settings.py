@@ -63,7 +63,12 @@ class Settings(BaseSettings):
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     mocks_dir_name: str = Field("data", alias="MOCKS_DIR_NAME")
     cors_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"],
+        default=[
+            "https://alexanimal.github.io",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:5174",
+        ],
         alias="CORS_ORIGINS",
     )
     langsmith_tracing: bool = Field(False, alias="LANGSMITH_TRACING")

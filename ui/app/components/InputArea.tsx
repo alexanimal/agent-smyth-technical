@@ -3,7 +3,7 @@ import { useChatWithMetadata } from '../hooks/useChatWithMetadata'
 import { useSettingsStore } from '../store/settingsStore'
 
 // Define the maximum character limit
-const MAX_CHAR_LIMIT = 2000
+const MAX_CHAR_LIMIT = 50000
 const WARNING_THRESHOLD = 0.8 // 80% of max chars
 
 /**
@@ -14,6 +14,7 @@ export const InputArea: React.FC = () => {
   const [inputValue, setInputValue] = useState('')
   const [isExpanded, setIsExpanded] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [cursorPosition, setCursorPosition] = useState<number | null>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -46,7 +47,7 @@ export const InputArea: React.FC = () => {
     const resizeTextarea = () => {
       if (textareaRef.current) {
         textareaRef.current.style.height = 'inherit'
-        const newHeight = Math.min(textareaRef.current.scrollHeight, 200)
+        const newHeight = Math.min(textareaRef.current.scrollHeight, 500)
         textareaRef.current.style.height = `${newHeight}px`
       }
     }
@@ -56,14 +57,22 @@ export const InputArea: React.FC = () => {
     }
   }, [inputValue, isExpanded])
 
-  // Focus input when expanded state changes
+  // Focus input/textarea when expanded state changes and restore cursor position
   useEffect(() => {
     if (isExpanded && textareaRef.current) {
       textareaRef.current.focus()
+      if (cursorPosition !== null) {
+        textareaRef.current.selectionStart = cursorPosition
+        textareaRef.current.selectionEnd = cursorPosition
+      }
     } else if (!isExpanded && inputRef.current) {
       inputRef.current.focus()
+      if (cursorPosition !== null) {
+        inputRef.current.selectionStart = cursorPosition
+        inputRef.current.selectionEnd = cursorPosition
+      }
     }
-  }, [isExpanded])
+  }, [isExpanded, cursorPosition])
 
   // Handle sending message
   const handleSendMessage = () => {
@@ -71,6 +80,7 @@ export const InputArea: React.FC = () => {
       sendMessage(inputValue)
       setInputValue('')
       setIsExpanded(false)
+      setCursorPosition(0)
 
       // Reset textarea height
       if (textareaRef.current) {
@@ -82,15 +92,20 @@ export const InputArea: React.FC = () => {
   // Handle input changes with character limit enforcement
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const newValue = e.target.value
+    const newCursorPosition = e.target.selectionStart
 
     // Only update if under character limit or if deleting text
     if (newValue.length <= MAX_CHAR_LIMIT || newValue.length < inputValue.length) {
       setInputValue(newValue)
+      setCursorPosition(newCursorPosition)
     }
   }
 
-  // Handle keyboard shortcuts
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  // Handle keyboard shortcuts and save cursor position before expansion
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // Save current cursor position
+    setCursorPosition(e.currentTarget.selectionStart)
+
     // Submit on Enter (but not with Shift+Enter which adds a new line)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -114,6 +129,14 @@ export const InputArea: React.FC = () => {
     }
   }
 
+  // Handle focus to save cursor position
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setCursorPosition(e.target.selectionStart)
+    if (!isExpanded && inputValue.length > 50) {
+      setIsExpanded(true)
+    }
+  }
+
   return (
     <div className="border-t dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
       <div ref={containerRef} className="relative max-w-4xl mx-auto">
@@ -124,6 +147,8 @@ export const InputArea: React.FC = () => {
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onFocus={handleFocus}
+              onClick={(e) => setCursorPosition(e.currentTarget.selectionStart)}
               placeholder="Type your message... (Shift+Enter for new line, Esc to minimize)"
               className={`w-full p-3 pr-16 rounded-lg border
                        ${isLoading ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-950'}
@@ -155,7 +180,8 @@ export const InputArea: React.FC = () => {
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              onFocus={() => inputValue.length > 50 && setIsExpanded(true)}
+              onFocus={handleFocus}
+              onClick={(e) => setCursorPosition(e.currentTarget.selectionStart)}
               placeholder="Type your message..."
               className={`w-full p-3 pr-16 rounded-full border ${isLoading ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-950'}
                       ${isAtLimit ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 dark:border-gray-700 focus:ring-blue-500 focus:border-transparent'}

@@ -1,6 +1,7 @@
 {
-  "name": "ui",
+  "name": "agent-smyth-technical",
   "version": "0.1.0",
+  "homepage": "https://alexanimal.github.io/agent-smyth-technical",
   "private": true,
   "type": "module",
   "scripts": {

@@ -42,6 +42,8 @@ async def handle_chat(
     - **num_results**: Number of sources to retrieve (default: 25, max: 250).
     - **context**: Optional contextual information.
     - **model**: Optional override for the LLM model.
+    - **generate_alternative_viewpoint**: Whether to generate an alternative viewpoint.
+    - **ranking_weights**: Optional weights for document ranking signals.
 
     Requires a valid API key via `X-API-Key` header in production.
 
@@ -55,7 +57,7 @@ async def handle_chat(
     start_time = time.time()
 
     # Add common response headers (Middleware adds X-Request-ID, X-Processing-Time)
-    response.headers["X-RateLimit-Limit"] = "100"  # Example
+    response.headers["X-RateLimit-Limit"] = "100"
     response.headers["X-RateLimit-Remaining"] = "99"  # Example
 
     # API Key Validation
@@ -147,6 +149,9 @@ async def stream_chat(
     - **message**: The user's query text (required). Length/content validation applies.
     - **num_results**: Number of sources to retrieve (default: 25, max: 250).
     - **model**: Optional override for the LLM model.
+    - **generate_alternative_viewpoint**: Whether to generate an alternative viewpoint.
+    - **ranking_weights**: Optional weights for document ranking signals.
+    - **context**: Optional contextual information.
 
     The stream contains the following events:
     - **start**: Indicates the start of processing
@@ -180,6 +185,7 @@ async def stream_chat(
             logger.info(
                 f"Processing streaming chat request {request_id} for message: '{request_body.message[:50]}...'"
             )
+
             result = await chat_service.process_query(
                 message=request_body.message,
                 k=request_body.num_results,

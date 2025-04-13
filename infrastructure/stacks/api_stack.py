@@ -32,7 +32,7 @@ class ApiStack(Stack):
             f"{id}-Service",
             task_image_options=ecs_patterns.NetworkLoadBalancedTaskImageOptions(
                 image=ecs.ContainerImage.from_docker_image_asset(docker_image),
-                container_port=8002,
+                container_port=8003,
                 environment={
                     "ENVIRONMENT": env_config.env_name,
                 },
@@ -55,23 +55,25 @@ class ApiStack(Stack):
                 },
             ),
             desired_count=1,
-            memory_limit_mib=32768,
-            cpu=8192,
+            memory_limit_mib=8192,  # 8GB is sufficient and more likely to be available
+            cpu=2048,  # 2 vCPU is reasonable for this workload
             # Listener port for NLB
             listener_port=80,
             # Add health check grace period - give app time to start
-            health_check_grace_period=Duration.seconds(120),
+            health_check_grace_period=Duration.seconds(300),  # 5 minutes
             # Add deployment configuration to fix the minHealthyPercent warning
-            min_healthy_percent=100,  # Keep at least one task running during deployment
-            max_healthy_percent=200,  # Allow starting a new task before stopping the old one
+            min_healthy_percent=0,  # Allow all existing tasks to be terminated before new ones start
+            max_healthy_percent=100,  # Only one task at a time to avoid resource contention
         )
 
         # Configure the target group's health check
         fargate_service.target_group.configure_health_check(
-            protocol=elbv2.Protocol.TCP,
+            port="8003",
+            protocol=elbv2.Protocol.HTTP,
+            path="/health",  # Assuming your app has a health endpoint
             healthy_threshold_count=2,
-            unhealthy_threshold_count=3,
-            timeout=Duration.seconds(5),
+            unhealthy_threshold_count=5,  # More tolerant
+            timeout=Duration.seconds(10),
             interval=Duration.seconds(30),
         )
 
