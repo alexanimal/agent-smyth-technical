@@ -1353,6 +1353,41 @@ class TestGenerateResponseNode:
                     mock_logger.error.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_generate_response_with_timeout(self, mock_state):
+        """Test generate_response_node when LLM raises a timeout error."""
+        # Make sure we have ranked docs
+        mock_state["ranked_docs"] = [
+            Document(page_content="Test content", metadata={"url": "test_url"})
+        ]
+
+        # Ensure generation_metrics exists to avoid None-related errors
+        mock_state["generation_metrics"] = {}
+
+        # Configure the mock to raise a timeout
+        with patch(
+            "app.rag.nodes.generate_with_fallback", side_effect=asyncio.TimeoutError("LLM timeout")
+        ) as mock_generate:
+            with patch("app.rag.nodes.logger") as mock_logger:
+                # Call the function
+                result = await generate_response_node(mock_state)
+
+                # Verify error handling
+                assert (
+                    result["response"]
+                    == "I'm sorry, I encountered an error while generating a response. Please try again."
+                )
+                assert result["sources"] == []
+
+                # Verify error was logged
+                mock_logger.error.assert_called_once()
+                mock_logger.warning.assert_called_once()
+
+                # Verify error is recorded in metrics (using string representation to avoid type issues)
+                error_msg = str(result["generation_metrics"])
+                assert "error" in error_msg
+                assert "LLM timeout" in error_msg
+
+    @pytest.mark.asyncio
     async def test_generate_response_with_all_query_types(self):
         """Test generate_response_node with all query types to ensure coverage."""
         query_types = ["general", "investment", "technical", "trading_thesis", "unknown"]

@@ -6,6 +6,7 @@ Retrieval Augmented Generation (RAG). Each function represents a step in the
 RAG pipeline, from query classification to response generation.
 """
 
+import asyncio
 import json
 import logging
 import time
@@ -118,14 +119,37 @@ async def classify_query_node(state: RAGState) -> RAGState:
         logger.info(f"Query classified in {classification_time:.2f}s using {model_name}")
 
         # Parse JSON result with confidence scores
-        confidence_scores = json.loads(classification_result.strip())
+        try:
+            # More robust JSON parsing with extensive error handling
+            classification_result_stripped = classification_result.strip()
 
-        # Validate expected keys
-        expected_keys = ["technical", "trading_thesis", "investment", "general"]
-        if not all(key in confidence_scores for key in expected_keys):
+            # Log the raw result for debugging
+            logger.debug(f"Raw classification result: '{classification_result_stripped}'")
+
+            # Check if empty before parsing
+            if not classification_result_stripped:
+                logger.warning("Empty classification result received, using defaults")
+                raise ValueError("Empty classification result")
+
+            confidence_scores = json.loads(classification_result_stripped)
+
+            # Validate expected keys
+            expected_keys = ["technical", "trading_thesis", "investment", "general"]
+            if not all(key in confidence_scores for key in expected_keys):
+                logger.warning(
+                    f"Invalid classification result missing required keys: {classification_result_stripped}, defaulting to general"
+                )
+                confidence_scores = {
+                    "technical": 0,
+                    "trading_thesis": 0,
+                    "investment": 0,
+                    "general": 100,
+                }
+        except (json.JSONDecodeError, ValueError) as json_error:
             logger.warning(
-                f"Invalid classification result: {classification_result}, defaulting to general"
+                f"Classification parsing failed: {str(json_error)}. Using default classification."
             )
+            # Default to general with low confidence when JSON parsing fails
             confidence_scores = {
                 "technical": 0,
                 "trading_thesis": 0,
@@ -346,7 +370,10 @@ async def rank_documents_node(state: RAGState) -> RAGState:
 
 async def generate_response_node(state: RAGState) -> RAGState:
     """
-    Node to generate a response based on retrieved documents and the user's query.
+    Node to generate a response based on the retrieved documents.
+
+    This node uses the query, classification, and ranked documents to generate a
+    response using the appropriate prompt template for the query type.
 
     Args:
         state: The current workflow state
@@ -354,29 +381,29 @@ async def generate_response_node(state: RAGState) -> RAGState:
     Returns:
         Updated workflow state with response and sources
     """
-    # Initialize variables to avoid UnboundLocalError in exception handling
-    generation_time = None
+    # Initialize time variables at the beginning to avoid UnboundLocalError in exception handling
     start_time = time.time()
+    generation_time = None
+
+    query = state["query"]
+    docs = state["ranked_docs"]
+    classification = state["classification"]
+
+    # Get model name from state
+    model_name = state.get("model", settings.default_model)
+
+    # Add generation metrics to state if not already present
+    metrics = ensure_generation_metrics(state)
 
     try:
-        query = state["query"]
-        docs = state["ranked_docs"]
-        metrics = ensure_generation_metrics(state)
+        logger.info(f"Generating response using model: {model_name}")
+        # start_time variable was moved to the beginning of the function
 
-        # Handle empty docs gracefully
-        if not docs or len(docs) == 0:
-            state["response"] = "I couldn't find any relevant information to answer your question."
-            state["sources"] = []
-            return state
-
-        # Get model name from state
-        model_name = state.get("model", settings.default_model)
-
-        # Build context string (joining all document content)
+        # Build context string from ranked docs
+        # This will be passed to the prompt template
         context_string = "\n\n---\n\n".join([doc.page_content for doc in docs])
 
-        # Get classification from state
-        classification = state.get("classification", {})
+        # Get query type from classification
         query_type = classification.get("query_type", "general")
 
         # Choose prompt template based on query type
@@ -446,17 +473,22 @@ async def generate_response_node(state: RAGState) -> RAGState:
         state["sources"] = list(set(sources))  # Deduplicate sources
 
     except Exception as e:
-        generation_time = time.time() - start_time
+        # Calculate generation_time if not already set
+        if generation_time is None:
+            generation_time = time.time() - start_time
+
         logger.error(f"Error generating response: {str(e)}", exc_info=True)
         state["response"] = (
             "I'm sorry, I encountered an error while generating a response. Please try again."
         )
         state["sources"] = []
-        metrics = ensure_generation_metrics(state)
         metrics["model"] = model_name
         metrics["error"] = str(e)
         metrics["document_count"] = len(docs)
         metrics["generation_time"] = generation_time
+
+        if isinstance(e, asyncio.TimeoutError):
+            logger.warning(f"Timeout occurred while generating response: {str(e)}")
 
     return state
 
@@ -475,11 +507,16 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
     Returns:
         Updated workflow state with alternative viewpoints
     """
+    # Initialize time variables at the beginning to avoid UnboundLocalError in exception handling
+    start_time = time.time()
+    generation_time = None
+
     # Check if alternative viewpoints are requested
     generate_alternative = state.get("generate_alternative_viewpoint", False)
 
     if not generate_alternative:
         logger.info("Alternative viewpoint generation skipped (not requested)")
+        state["alternative_viewpoints"] = None
         return state
 
     query = state["query"]
@@ -493,67 +530,91 @@ async def generate_alternative_node(state: RAGState) -> RAGState:
     query_type = classification["query_type"]
     is_mixed = classification["is_mixed"]
 
-    if query_type in ["investment", "trading_thesis", "technical"] and not is_mixed:
-        try:
-            logger.info(f"Generating alternative viewpoint using model: {model_name}")
-            start_time = time.time()
+    logger.info(
+        f"Alternative viewpoint requested for query type: {query_type}, is_mixed: {is_mixed}"
+    )
 
-            # Build context string
-            context_string = "\n\n---\n\n".join([doc.page_content for doc in docs])
+    # Initialize to None - ensure it's always set
+    state["alternative_viewpoints"] = None
 
-            # Choose prompt template - fix the potential None issue
-            prompt_template_getter = {
-                "investment": PromptManager.get_investment_prompt,
-                "trading_thesis": PromptManager.get_trading_thesis_prompt,
-                "technical": PromptManager.get_technical_analysis_prompt,
-            }.get(query_type)
+    # Relaxed condition to generate for all query types, not just specific ones
+    # This helps when classification isn't working as expected
+    try:
+        logger.info(f"Generating alternative viewpoint using model: {model_name}")
+        # start_time was moved to the beginning of the function
 
-            if prompt_template_getter:
-                prompt_template = prompt_template_getter()
+        # Build context string
+        context_string = "\n\n---\n\n".join([doc.page_content for doc in docs])
 
-                # Build inputs for the prompt
-                inputs = RunnableParallel(
-                    context=RunnableLambda(lambda x: context_string),
-                    question=RunnablePassthrough(),
-                )
+        # Choose prompt template based on query type
+        prompt_template = None
 
-                # Use a higher temperature for alternative viewpoints
-                counter_prompt = (
-                    f"Generate an alternative perspective or counter-argument to: {query}"
-                )
+        # Try to get type-specific template first
+        prompt_templates = {
+            "investment": PromptManager.get_investment_prompt,
+            "trading_thesis": PromptManager.get_trading_thesis_prompt,
+            "technical": PromptManager.get_technical_analysis_prompt,
+            "general": PromptManager.get_general_prompt,
+        }
 
-                prompt_inputs = await inputs.ainvoke(counter_prompt)
-                prompt_messages = await prompt_template.ainvoke(prompt_inputs)
+        prompt_template_getter = prompt_templates.get(query_type)
 
-                # Use a higher temperature for exploring alternatives
-                alternative_response = await generate_with_fallback(
-                    prompt=prompt_messages,
-                    model_name=model_name if model_name is not None else settings.default_model,
-                    fallback_model="gpt-3.5-turbo",
-                    temperature=0.7,  # Higher temperature for more creative alternatives
-                )
+        if prompt_template_getter:
+            logger.info(f"Using {query_type}-specific prompt template for alternative viewpoint")
+            prompt_template = prompt_template_getter()
+        else:
+            # Fallback to general prompt if type-specific not available
+            logger.info(
+                f"No specific template for {query_type}, using general prompt template instead"
+            )
+            prompt_template = PromptManager.get_general_prompt()
 
-                # Ensure the alternative viewpoint is properly converted to a string
-                alternative_viewpoints = StrOutputParser().parse(alternative_response)
-                alternative_viewpoints = ensure_string_content(alternative_viewpoints)
+        # Build inputs for the prompt
+        inputs = RunnableParallel(
+            context=RunnableLambda(lambda x: context_string),
+            question=RunnablePassthrough(),
+        )
 
-                generation_time = time.time() - start_time
-                logger.info(
-                    f"Alternative viewpoint generated in {generation_time:.2f}s using {model_name}"
-                )
+        # Create a prompt specifically for alternative viewpoint
+        counter_prompt = f"Generate an alternative perspective or counter-argument to: {query}"
+        logger.debug(f"Using counter prompt: {counter_prompt}")
 
-                # Update state
-                state["alternative_viewpoints"] = alternative_viewpoints
+        prompt_inputs = await inputs.ainvoke(counter_prompt)
+        prompt_messages = await prompt_template.ainvoke(prompt_inputs)
 
-                metrics = ensure_generation_metrics(state)
-                metrics["alternative_time"] = generation_time
-            else:
-                logger.warning(f"No prompt template found for query type: {query_type}")
+        # Use a higher temperature for exploring alternatives
+        alternative_response = await generate_with_fallback(
+            prompt=prompt_messages,
+            model_name=model_name if model_name is not None else settings.default_model,
+            fallback_model="gpt-3.5-turbo",
+            temperature=0.7,  # Higher temperature for more creative alternatives
+        )
 
-        except Exception as e:
-            logger.warning(f"Failed to generate alternative viewpoints: {str(e)}")
-            # Record the error but don't fail the whole process
-            metrics = ensure_generation_metrics(state)
-            metrics["alternative_error"] = str(e)
+        # Ensure the alternative viewpoint is properly converted to a string
+        alternative_viewpoints = StrOutputParser().parse(alternative_response)
+        alternative_viewpoints = ensure_string_content(alternative_viewpoints)
+
+        generation_time = time.time() - start_time
+        logger.info(f"Alternative viewpoint generated in {generation_time:.2f}s using {model_name}")
+
+        # Update state
+        state["alternative_viewpoints"] = alternative_viewpoints
+
+        metrics = ensure_generation_metrics(state)
+        metrics["alternative_time"] = generation_time
+
+    except Exception as e:
+        # Calculate generation_time if not already set
+        if generation_time is None:
+            generation_time = time.time() - start_time
+
+        logger.error(f"Failed to generate alternative viewpoints: {str(e)}", exc_info=True)
+        # Set to None on error as expected by tests
+        state["alternative_viewpoints"] = None
+        # Record the error but don't fail the whole process
+        metrics = ensure_generation_metrics(state)
+        metrics["alternative_error"] = str(e)
+        if isinstance(e, asyncio.TimeoutError):
+            logger.warning(f"Timeout occurred while generating alternative viewpoint: {str(e)}")
 
     return state

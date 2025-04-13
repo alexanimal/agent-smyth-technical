@@ -14,7 +14,11 @@ The PromptManager class serves as a factory for getting appropriately
 formatted prompts for different use cases.
 """
 
+from typing import Optional
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts.chat import HumanMessagePromptTemplate, SystemMessagePromptTemplate
 
 
 class PromptManager:
@@ -237,72 +241,83 @@ class PromptManager:
     @staticmethod
     def get_classification_prompt() -> ChatPromptTemplate:
         """
-        Get the prompt template for query classification.
+        Get a prompt template for classifying user queries.
 
-        Creates a prompt template specifically designed to classify incoming
-        queries into predefined categories with confidence scores to avoid rigid categorization.
+        Creates a prompt template for classifying user queries into predefined
+        categories with confidence scores.
 
         Returns:
             ChatPromptTemplate: A configured prompt template for query classification
         """
-        return ChatPromptTemplate.from_messages(
+        # Create a hardcoded example of the JSON response to avoid formatting issues
+        example_json = (
+            "{{\n"
+            '  "technical": 75,\n'
+            '  "trading_thesis": 10,\n'
+            '  "investment": 15,\n'
+            '  "general": 0\n'
+            "}}"
+        )
+
+        # Define the system prompt with the hardcoded example
+        system_content = (
+            "You are a financial query classifier for a trading assistant system. "
+            "Your job is to analyze incoming queries and provide confidence scores "
+            "for how well they match different query types.\n\n"
+            "Consider these query types:\n\n"
+            "1. TECHNICAL: Queries that mention chart patterns, technical analysis, "
+            "moving averages, MACD, RSI, resistance, support, trend lines, volume, "
+            "stochastic, fibonacci, bollinger bands, or other technical indicators\n\n"
+            "2. TRADING_THESIS: Queries about:\n"
+            "   - Requests to transform brief notes into comprehensive trading ideas\n"
+            "   - Developing structured investment theses from initial concepts\n"
+            "   - Expanding on portfolio manager notes with supporting analysis\n"
+            '   - The phrase "trading thesis" or "thesis"\n'
+            "   - Creating detailed trade rationales with entry/exit strategies\n\n"
+            "3. INVESTMENT: Queries about:\n"
+            "   - Stock symbols or company names\n"
+            "   - Stock market indexes\n"
+            "   - General market analysis, stock fundamentals, or company performance\n"
+            "   - Investment decisions, buy/sell recommendations based on fundamentals\n"
+            "   - Market sectors, trends, economic factors, or market news\n"
+            "   - Portfolio allocation, diversification strategies\n"
+            "   - Company earnings, valuations, or financial metrics\n\n"
+            "4. GENERAL: Queries that don't fit the above categories, such as:\n"
+            "   - General questions about the assistant itself\n"
+            "   - Non-financial questions\n"
+            "   - Questions about using the system\n\n"
+            "For the given query, provide a JSON object with confidence scores (0-100) "
+            "for each category.\n\n"
+            "IMPORTANT FORMAT INSTRUCTIONS:\n"
+            "- Your response must ONLY contain a valid JSON object with no extra text\n"
+            "- Do not include markdown code blocks or any other formatting\n"
+            "- Do not include explanations before or after the JSON\n"
+            "- Ensure all JSON values are numbers, not strings\n"
+            "- The JSON object must have exactly these four keys: technical, trading_thesis, investment, general\n\n"
+            "Example correct response:\n" + example_json + "\n\n"
+            "CLASSIFICATION RULES:\n"
+            "1. Analyze the full context of the query. A query may have elements of multiple categories.\n"
+            "2. Assign confidence based on the main intent of the query, not just keyword matching.\n"
+            "3. ANY mention of technical indicators or chart analysis should receive at least 60 points in the technical category.\n"
+            "4. If a query mentions both technical analysis AND fundamental/investment aspects, split the scores appropriately.\n"
+            "5. Do not rely solely on keywords - understand the intent behind the query.\n"
+            "6. The sum of all confidence scores MUST be exactly 100.\n"
+            "7. All scores must be integers between 0 and 100.\n\n"
+            "Remember, your task is ONLY to output the classification JSON with no additional explanation or text."
+        )
+
+        # Create a completely new template with explicit input variables
+        prompt = ChatPromptTemplate.from_messages(
             [
-                (
-                    "system",
-                    """
-            You are a financial query classifier for a trading assistant system. Your job is to analyze incoming queries and provide confidence scores for how well they match different query types.
-
-            Consider these query types:
-
-            1. TECHNICAL: Queries that mention:
-               - Technical indicators (RSI, MACD, Bollinger Bands, moving averages, etc.)
-               - Chart patterns (head and shoulders, double top, triangle, flag, etc.)
-               - Support/resistance levels, price targets based on technical factors
-               - Volume analysis, price action, or candlestick patterns
-               - Timeframe analysis (daily, weekly charts)
-               - Trend lines, channels, or Fibonacci retracements
-               - The phrase "technical analysis" or "technicals"
-               - Chart analysis requests
-
-            2. TRADING_THESIS: Queries about:
-               - Requests to transform brief notes into comprehensive trading ideas
-               - Developing structured investment theses from initial concepts
-               - Expanding on portfolio manager notes with supporting analysis
-               - The phrase "trading thesis" or "thesis"
-               - Creating detailed trade rationales with entry/exit strategies
-
-            3. INVESTMENT: Queries about:
-               - Stock symbols or company names
-               - Stock market indexes
-               - General market analysis, stock fundamentals, or company performance
-               - Investment decisions, buy/sell recommendations based on fundamentals
-               - Market sectors, trends, economic factors, or market news
-               - Portfolio allocation, diversification strategies
-               - Company earnings, valuations, or financial metrics
-
-            4. GENERAL: Queries that don't fit the above categories, such as:
-               - General questions about the assistant itself
-               - Non-financial questions
-               - Questions about using the system
-
-            For the given query, provide a JSON object with confidence scores (0-100) for each category.
-            Your response should follow this exact format:
-            ```json
-            {{"technical": X, "trading_thesis": Y, "investment": Z, "general": W}}
-            ```
-
-            Where X, Y, Z, and W are numeric values from 0-100 representing your confidence that the query belongs to each category.
-            The sum of all confidence scores should be 100.
-
-            IMPORTANT: Analyze the full context of the query. A query may have elements of multiple categories.
-            Assign confidence based on the main intent of the query, not just keyword matching.
-
-            Return ONLY the JSON object with no additional text.
-            """,
-                ),
-                ("human", "{query}"),
+                SystemMessagePromptTemplate.from_template(system_content),
+                HumanMessagePromptTemplate.from_template("{query}"),
             ]
         )
+
+        # Manually override the input_variables to ensure only "query" is included
+        prompt.input_variables = ["query"]
+
+        return prompt
 
     @staticmethod
     def get_technical_analysis_prompt() -> ChatPromptTemplate:
