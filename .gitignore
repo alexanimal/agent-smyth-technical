@@ -18,3 +18,4 @@ ui/dist/
 ui/tsconfig.tsbuildinfo
 coverage.xml
 coverage.json
+alexanimal*
