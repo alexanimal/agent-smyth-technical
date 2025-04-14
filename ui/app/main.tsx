@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import * as Sentry from "@sentry/react";
 import './index.css'
+import './instrument'
 import App from './App'
 import { Provider } from 'react-redux'
 import { store, persistor } from './store/store'
@@ -27,14 +29,22 @@ const router = createHashRouter([
   },
 ])
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById('root')!, {
+  onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
+    console.warn('Uncaught error', error, errorInfo.componentStack);
+  }),
+  // Callback called when React catches an error in an ErrorBoundary.
+  onCaughtError: Sentry.reactErrorHandler(),
+  // Callback called when React automatically recovers from errors.
+  onRecoverableError: Sentry.reactErrorHandler(),
+}).render(
   <StrictMode>
-    <ErrorBoundary>
+    <Sentry.ErrorBoundary>
       <Provider store={store}>
         <PersistGate loading={null} persistor={persistor}>
           <RouterProvider router={router} />
         </PersistGate>
       </Provider>
-    </ErrorBoundary>
+    </Sentry.ErrorBoundary>
   </StrictMode>,
 )
