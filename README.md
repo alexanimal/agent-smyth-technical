@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/github/alexanimal/agent-smyth-technical/graph/badge.svg?token=B2BI5398GF)](https://codecov.io/github/alexanimal/agent-smyth-technical)
 [![UI](https://img.shields.io/badge/Try%20It-Live%20Demo-blue)](https://alexanimal.github.io/agent-smyth-technical/)
-[![APIDocs](https://img.shields.io/badge/API-Docs-blue)](https://agent-smyth-lb.alexanimal.com/docs)
+[![APIDocs](https://img.shields.io/badge/API-Docs-green)](https://agent-smyth-lb.alexanimal.com/docs)
 
 
 
