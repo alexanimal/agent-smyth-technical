@@ -6,5 +6,9 @@
     "us-east-1d",
     "us-east-1e",
     "us-east-1f"
-  ]
+  ],
+  "hosted-zone:account=998403024947:domainName=alexanimal.com:region=us-east-1": {
+    "Id": "/hostedzone/Z0328525FEM0LQHW3EH2",
+    "Name": "alexanimal.com."
+  }
 }

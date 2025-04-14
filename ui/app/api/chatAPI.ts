@@ -1,7 +1,7 @@
 import { SendMessageParams } from '../store/types'
 
 // Define the base URL for our chat API
-const API_BASE_URL = 'http://localhost:8003'
+const API_BASE_URL = 'https://agent-smyth-lb.alexanimal.com'
 const REGULAR_ENDPOINT = `${API_BASE_URL}/chat`
 const STREAMING_ENDPOINT = `${API_BASE_URL}/chat/stream`
 
