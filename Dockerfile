@@ -19,7 +19,7 @@ RUN pip install poetry
 RUN poetry config virtualenvs.create false
 
 # Copy project configuration
-COPY pyproject.toml poetry.lock README.md ./
+COPY pyproject.toml poetry.lock ./
 
 # Copy source code
 COPY app/ ./app/
